@@ -1,1 +1,2 @@
 # CSEC-731
+Hello Guys, I created this repo so that we all have access to the latest version of the assignment at all times. This also helps us to know and keep track of what others are doing, so I hope you can keep it as up to date as you can.
