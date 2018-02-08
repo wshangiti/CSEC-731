@@ -5,4 +5,4 @@ I created three folders each correspond to one activity in the assignment as fol
 
 - web_server: This is activity one and Steve's work will be here.
 - web_app_php: This is activity two and Weeam's work will be here.
-- web_app_other: This is the optional part of the assignment, I hope we can get done as well. Maybe Taylor will handle this part?
+- web_app_other: This is the optional part of the assignment, I hope we can get done as well. Maybe Tyler will handle this part?
