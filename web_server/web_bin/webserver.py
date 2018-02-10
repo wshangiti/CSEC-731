@@ -28,13 +28,28 @@ def debug_vars(val):
 		print("LOG_REQUEST_BAD: " + LOG_REQUEST_BAD)
 		print("CONNETIONS: " + CONNECTIONS)
 
+def processRequest(clientRequest):
+	pass
+
+
+
+
+
+
 def requestHandler(clientSock):
-	response='HTTP/1.1 200 OK\r\n\r\n'
-	body='<b>Hello</b> world'
-	footer='\r\n\r\n'
+	#print("Reached response Handler")
+	clientReq=clientSock.recv(1024)
+	print(clientReq)
+	response="HTTP/1.1 200 OK\r\n\r\n"
+	body="<b>Hello</b> world"
+	footer="\r\n\r\n"
 	
-	clientSock.send(response+body+footer)
+	# Combine full reponse	
+	fullResponse =bytes(("%s%s%s" % (response,body,footer)),'UTF-8')
+	print(fullResponse)	
+	clientSock.send(fullResponse)
 	clientSock.close()
+	pass
 
 # Primary code
 def main():
@@ -44,20 +59,24 @@ def main():
 	sock.bind((LISTEN_IP,int(LISTEN_PORT)))
 	
 	try:
-		#s.listen(10)
-		sock.listen(int(CONNECTIONS))
+		#sock.listen(0)
+		sock.listen(10)
+		#sock.listen(int(CONNECTIONS))
 
 		while True:
+			print("Waiting for Connection...")
 			(client_socket,client_addr) = sock.accept()
-			print(client_addr[0]+" "+client_addr[1])
-			
-			# Start Threating Requests
-			threading.Thread(target=requestHandler, args=(client_socket,))
+			#print(client_addr[0])
+			#print(client_addr[1])
+			#print((client_socket,))	
+			# Start Threading Requests
+			threading.Thread(target=requestHandler, args=((client_socket,))).start()
 			
 
-	except:
+	except (OSError,):
 		print("Exception Caught")
-		sock.close()	
+		sock.close()
+		pass
 
 # Execute Server
 main()
