@@ -1,4 +1,4 @@
-/bin/python3
+#!/bin/python3
 # Import Needed Libraries
 import socket # Primary Network Connection
 import os # Forcommand line execution
@@ -85,4 +85,4 @@ def main():
 
 # Execute Server
 
-main()
+#main()
