@@ -3,17 +3,49 @@
 session_start();
 //first: check if user is logged in
 
-  //if logged in
+  //check if logged in
   if(isset($_SESSION["isLoggedIn"])){
-      //read user information and show it
-      $fname = $_SESSION["fname"];
-      $lname = $_SESSION["lname"];
-      $pass  = $_SESSION["pass"];
-      $cell  = $_SESSION["cell"];
-      echo getProfileHTML($fname,$lname,$pass,$cell);
+      //user is logged in
+      $message = "";
+      //option1: user clicked on logout
+      if(isset($_POST["logout"])){
+        //user clicked logout button
+        logout();
+        header("Refresh:0");
+      }
+
+      //option2: user clicked on update
+      if(isset($_POST['update'])){
+        //save session
+        $_SESSION["fname"] = $_POST['fname'];
+        $_SESSION["lname"] = $_POST['lname'];
+        $_SESSION["pass"] = $_POST['pass'];
+        $_SESSION["cell"] = $_POST['cell'];
+
+        //save new information to database
+        $status = setUserInfo($_SESSION["fname"], $_SESSION["lname"], $_SESSION["pass"], $_SESSION["cell"]);
+
+        if($status == true){
+          //update has been successful
+          $message = "Update was successful";
+        }
+        else{
+          //update was NOT successful
+          $message = "Sorry, update was NOT successful";
+        }
+      }
+
+        //user did not click on anything
+        //read user information and show it
+        $fname = $_SESSION["fname"];
+        $lname = $_SESSION["lname"];
+        $pass  = $_SESSION["pass"];
+        $cell  = $_SESSION["cell"];
+        echo getProfileHTML($fname,$lname,$pass,$cell, $message);
+      
   }
   else
-  {
+  {//user has not logged in
 
     //check if user has submitted form or not 
     if (empty($_GET)){
@@ -49,6 +81,7 @@ session_start();
               $_SESSION["lname"] = $lname2;
               $_SESSION["pass"] = $pass2;
               $_SESSION["cell"] = $cell2;
+              header("Refresh:0");
           }
           else{
               //incorrect username/password
@@ -59,7 +92,29 @@ session_start();
     }
 
   }
-    
+
+function setUserInfo($fname, $lname, $pass, $cell){
+  //save to DB
+  return true;
+}
+function getUserInfo(){
+  $info = array('fname' => $fname,
+                'lname' => $lname,
+                'pass'  => $pass, 
+                'cell' => $cell);
+  return $info;
+}
+
+function logout()
+{
+  unset($_SESSION["isLoggedIn"]);
+  unset($_SESSION["fname"]);
+  unset($_SESSION["lname"]);
+  unset($_SESSION["pass"]);
+  unset($_SESSION["cell"]);
+  session_unset();
+  session_destroy();
+}
 
 //function to load the HTML of the login page
 function getLoginHTML($message="")
@@ -90,7 +145,7 @@ function getLoginHTML($message="")
 }
 
 
-function getProfileHTML($firstname, $lastname, $password, $cell)
+function getProfileHTML($firstname, $lastname, $password, $cell, $message)
 {
   echo "<!DOCTYPE html>
         <html lang='en'> 
@@ -102,7 +157,7 @@ function getProfileHTML($firstname, $lastname, $password, $cell)
             <section class='container'>
               <div class='login'>
                 <h1>*** Your Profile Info ***</h1>
-                  <form method='post' action='login.html'>
+                  <form method='post' action='./'>
                     <div><span>First name:</span><input type='text' name='fname' value='$firstname'></div>
                     <div><span>Last name:</span><input type='text' name='lname' value='$lastname'></div>
                     <div><span>Password:</span><input type='password' name='pass' value='$password'></div>
@@ -112,9 +167,10 @@ function getProfileHTML($firstname, $lastname, $password, $cell)
                     <p>Password:   <input type='text' name='Profile' ></p>
                     <p>Phone #:   <input type='text' name='Profile' ></p> -->
 
-                    <p class='submit'><input type='submit' name='commit' value='Update Info'></p>
-                    <p class='submit'><input type='submit' name='commit' value='Log out'></p>
+                    <p class='submit'><input type='submit' name='update' value='Update Info'></p>
+                    <p class='submit'><input type='submit' name='logout' value='Log out'></p>
                   </form>
+                  <p style='color:red;text-align:center;'>$message</p>
               </div> 
             </section> 
           </body>
