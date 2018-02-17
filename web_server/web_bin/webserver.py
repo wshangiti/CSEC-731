@@ -12,16 +12,6 @@ exec(open(config_file).read())
 #### Set Global Variables
 log_date = datetime.datetime.now().strftime("%Y_%m_%d")
 
-RESPONSE_CODES={
-        '200':'OK',
-        '400':'Bad Request',
-        '401':'Unauthorized',
-        '403':'Forbidden',
-        '404':'Not Found',
-        '411':'fries',
-        '500':'Internal Server Error',
-        '505':'HTTP Version not supported'
-        }
 ###### Primary functions
 # Function to log request
 def log_request():
@@ -36,32 +26,6 @@ def debug_vars(val):
                 print("LOG_REQUEST_GOOD: " + LOG_REQUEST_GOOD)
                 print("LOG_REQUEST_BAD: " + LOG_REQUEST_BAD)
                 print("CONNETIONS: " + CONNECTIONS)
-def processMethod(reqMethood):
-        switcher = {
-        "GET": "January",
-        "POST": "February",
-        "PUT": "March",
-        "DELETE": "April",
-        "CONNECT": "May",
-        }
-        switcher.get(reqMethood, "METHOD REQUEST NOT SUPPORTED")
-
-def getfile(http_req):
-	splitreq = http_req.split("\n")
-	print splitreq
-	return splitreq.split(" ")[1]
-	
-def getHeaders(http_req):
-	spitreq = http_req.split("\n")
-	headerlist = []
-	headernum = 1
-	while splitreq[headernum] != "\r":
-		headerlist.append(spitreq[headernum])
-		headernum = headernum+1
-		headerparts = spitreq[headernum].split(":")
-		print "Key: %s, Value: %s" % (headerparts[0], headerparts[1])
-		print "%s=%s" % (headerparts[0], headerparts[1])
-	return headerlist
 
 def processRequest(clientRequest):
         print(clientRequest)
@@ -121,4 +85,5 @@ def main():
 
 # Execute Server
 
-#main()
+main()
+
