@@ -16,8 +16,6 @@ exec(open(app_config_file).read())
 WEBAPP_ROOT = WEBAPP_ROOT.rstrip('/')
 #print("WEBAPP_ROOT: "+ WEBAPP_ROOT)
 ##########################################################
-### Set Global Variables
-log_date = datetime.datetime.now().strftime("%Y_%m_%d")
 
 ###### Primary functions
 
@@ -68,8 +66,26 @@ def getVars(uri):
         uriparts[0] = uriparts[0]+DEFAULT_ROOT_PAGE
     return uriparts
 
-def log_request():
-    time_stamp = datetime.datetime.now().strftime("%Y-%m-%d::%H:%M")
+def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,destPort):
+    time_stamp = datetime.datetime.now().strftime("%Y-%m-%d::%H:%M:%S")
+    if not os.path.exists('LOG_REQUEST_BAD'):
+        open('LOG_REQUEST_BAD', 'w').close()
+    if not os.path.exists('LOG_REQUEST_GOOD'):
+        open('LOG_REQUEST_GOOD', 'w').close()
+
+    logstring="%s Source:%s:%s Destination:%s:%s \"%s %s\" %s %s\r\n" %(time_stamp,sourceIP,sourcePort,destIP,destPort,method,uri,httpVersion,statusCode)
+
+    # If log files doent exist create them
+    if (statusCode != '200'):
+        file = open(LOG_REQUEST_BAD, "a")
+        file.write(logstring)
+        file.close()
+    else:
+        file = open(LOG_REQUEST_GOOD, "a")
+        file.write(logstring)
+        file.close()
+
+
 
 def processMethod(reqMethod,exportHeaderList,fullFilePath):
     if(reqMethod == 'GET'):
@@ -99,6 +115,7 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath):
         except Exception as e:
             print(e)
             statusCode='500'
+            body=''
     elif(reqMethod == 'PUT'):
         pass
     elif(reqMethod == 'OPTIONS'):
@@ -124,7 +141,7 @@ def getfile(http_req):
     #print(splitreq)
     return splitreq[1].split(" ")[1]
 
-def processRequest(clientRequest):
+def processRequest(clientRequest,sourceIP,sourcePort,destIP,destPort):
     print("CLIENT REQUEST:\n\n"+clientRequest)
     splitreq = clientRequest.split("\n")
     method = str(splitreq[0].split(" ")[0]).strip()
@@ -140,9 +157,9 @@ def processRequest(clientRequest):
     print("uriparts: "+str(uriparts))
     exportHeaderList = getHeaders(clientRequest,method,fullFilePath,uriparts)
     print("NEW HEADER LIST:\n\n"+str(exportHeaderList))
-    return processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath)
+    return processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort)
 
-def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath):
+def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort):
     # 505 Check
     if(httpVersion not in HTTP_VERSION_SUPPORT):
         statusCode='505'
@@ -157,14 +174,22 @@ def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath):
     if(statusCode != '200'):
         body="<b>"+statusCode+": </b>"+RESPONSE_CODES[statusCode]
 
+    log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,destPort)
+
     response="HTTP/1.1 %s %s\r\n\r\n" % (statusCode,RESPONSE_CODES[statusCode])
     footer="\r\n\r\n"
     return (response, body, footer)
 
 def requestHandler(clientSock):
     clientReq=clientSock.recv(1024).decode()
+    sourceIP = clientSock.getpeername()[0]
+    sourcePort=clientSock.getpeername()[1]
+    destIP= clientSock.getsockname()[0]
+    destPort= clientSock.getsockname()[1]
 
-    (response, body, footer) = processRequest(clientReq)
+    print("SOURCE IP: "+ sourceIP)
+
+    (response, body, footer) = processRequest(clientReq,sourceIP,sourcePort,destIP,destPort)
 
     fullResponse ="%s%s%s" % (response,body,footer)
 
