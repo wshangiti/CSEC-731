@@ -21,174 +21,179 @@ log_date = datetime.datetime.now().strftime("%Y_%m_%d")
 
 ###### Primary functions
 
-def getHeaders(http_req):
-	exportList=''
-	splitreq = http_req.split("\n")
-	headerlist = []
-	headernum = 1
-	while splitreq[headernum] != "\r":
-		headerparts = splitreq[headernum].split(":")
-		if(len(headerparts) == 3):
-			headerparts[1] = headerparts[1]+':'+headerparts[2]
-		for hmap in HTTP_BASH_MAP:
-			if(hmap[0] == headerparts[0]):
-				headerparts[1]=(headerparts[1].strip('\r')).strip()
-				exportList += "export %s='%s'; " % (hmap[1],headerparts[1])
-				headerlist.append(hmap[1])
-		headernum += 1
-	return exportList;
+def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
+
+    splitreq = http_req.split("\n")
+    headerlist = []
+    headernum = 0
+
+    while splitreq[headernum] != "\r":
+        headerparts = splitreq[headernum].split(": ")
+        for hmap in HTTP_BASH_MAP:
+            if(hmap[0] == headerparts[0]):
+                headerparts[1]=(headerparts[1].strip('\r')).strip()
+                headerlist.append(([hmap[1],headerparts[1]]))
+        headernum += 1
+    headerlist += DEFAULT_EXPORTS
+    if(len(uriparts) > 1):
+        headerlist.append((['QUERY_STRING', uriparts[1]]))
+    headerlist.append((['SCRIPT_FILENAME',fullFilePath]))
+    headerlist.append((['REQUEST_METHOD', reqMethod]))
+
+    #print(headerlist)
+    return headerlist
 
 def getCGIHeaders(http_req):
-	exportList=''
-	splitreq = http_req.split("\\n")
-	headerlist = []
-	headernum = 1
-	while headernum < len(splitreq):
-		headerparts = splitreq[headernum].split(": ")
-		for hmap in HTTP_BASH_MAP:
-			if(hmap[0] == headerparts[0]):
-				headerparts[1]=(headerparts[1].strip('\\r')).strip()
-				exportList += "export %s='%s'; " % (hmap[1],headerparts[1])
-		headernum += 1
-	return exportList;
+    print("CGIHEADER REUESTS:\n\n"+ http_req)
+    splitreq = http_req.split("\n")
+    headerlist = []
+    headernum = 0
+    while headernum < len(splitreq):
+        headerparts = splitreq[headernum].split(": ")
+        for hmap in HTTP_BASH_MAP:
+            if (hmap[0] == headerparts[0]):
+                headerparts[1] = (headerparts[1].strip('\r')).strip()
+                headerlist.append(([hmap[1], headerparts[1]]))
+        headernum += 1
+    for he in headerlist:
+        if(he[0] == 'HTTP_COOKIE'):
+            headerlist.append((['SET_COOKIES','TRUE']))
+    #print(headerlist)
+    return headerlist
 
 def getVars(uri):
-	uriparts =uri.split('?')
-	return uriparts
+    uriparts =uri.split('?')
+    # if request is to root of directory use default Root Page
+    if(uriparts[0] == '/'):
+        uriparts[0] = uriparts[0]+DEFAULT_ROOT_PAGE
+    return uriparts
 
 def log_request():
-        time_stamp = datetime.datetime.now().strftime("%Y-%m-%d::%H:%M")
-
-def debug_vars(val):
-        if val:
-                print("LISTEN_IP: " + LISTEN_IP)
-                print("LISTEN_PORT: " + LISTEN_PORT)
-                print("HTTP_METHODS: " + str(HTTP_METHODS))
-                print("WEBAPP_ROOT: " + WEBAPP_ROOT)
-                print("LOG_REQUEST_GOOD: " + LOG_REQUEST_GOOD)
-                print("LOG_REQUEST_BAD: " + LOG_REQUEST_BAD)
-                print("CONNETIONS: " + CONNECTIONS)
-                print("HTTP_VERSION_SUPPORT: " + str(HTTP_VERSION_SUPPORT))
-	
+    time_stamp = datetime.datetime.now().strftime("%Y-%m-%d::%H:%M")
 
 def processMethod(reqMethod,exportHeaderList,fullFilePath):
-	if(reqMethod == 'GET'):
-		runscript = "%s export REQUEST_METHOD='%s';" % (exportHeaderList, reqMethod)
-		runscript = "export GATEWAY_INTERFACE='CGI/1.1';"
-		runscript += " export REQUEST_METHOD='%s';" % (reqMethod)
-		runscript += " export SCRIPT_FILENAME='%s';"  % (fullFilePath)
-		runscript += " export SERVER_PROTOCOL='HTTP/1.1';"
-		runscript += " export REDIRECT_STATUS='HTTP/1.1';"
-		#runscript += " export CONTENT_TYPE='application/x-www-form-urlencoded';"
-		#runscript += " export CONTENT_TYPE='text/html';"
-		runscript += " export REMOTE_HOST='%s';" %('127.0.0.1')
-		runscript += " export HTTP_HOST='%s';" %('127.0.0.1')
-		#if()		
-		#runscript += "export QUERY_STRING='%s';" (uriparts[1])
-		runscript += "php-cgi -f %s"  % (fullFilePath)
-		try:
-			body = str(subprocess.check_output(runscript,stderr=subprocess.STDOUT,shell=True))
-			body = body.strip('^b"').split("\\r\\n\\r\\n")
-			moreHeaderList = getCGIHeaders(body[0])
-			subprocess.check_output(moreHeaderList,stderr=subprocess.STDOUT,shell=True)
-			body = str(body[1].replace("\\n",""))
-			#print(body)
-			statusCode='200'
-		except Exception as e:
-			print(e)
-			statusCode='500'
-	elif(reqMethod == 'PUT'):
-		pass
-	elif(reqMethod == 'OPTIONS'):
-		pass
-	elif(reqMethod == 'HEAD'):
-		pass
-	elif(reqMethod == 'POST'):
-		pass
-	elif(reqMethod == 'DELETE'):
-		pass
-	elif(reqMethod == 'TRACE'):
-		pass
-	elif(reqMethod == 'CONNECT'):
-		pass
-	else:
-		body=''
-		statusCode='400'
-	return(statusCode,body)
+    if(reqMethod == 'GET'):
+        print("REACHED: GET")
+        executeMethod = "php-cgi -f %s" % (fullFilePath)
+
+        runscript=''
+        for hmap in exportHeaderList:
+            print("export %s='%s'; " % (hmap[0], hmap[1]))
+            runscript += "export %s='%s'; " % (hmap[0], hmap[1])
+        runscript += executeMethod
+        try:
+            body = str(subprocess.check_output(runscript,stderr=subprocess.STDOUT,shell=True))
+            print("ORIGBODY: \n\n"+body)
+            body = body.strip('^b"').split("\r\n\r\n")
+            #print(body)
+            moreHeaderList = getCGIHeaders(body[0])
+            extrarunscript = ''
+            for hmap in moreHeaderList:
+                print("export %s='%s'; " % (hmap[0], hmap[1]))
+                extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
+            print(extrarunscript)
+            body2 = subprocess.check_output(extrarunscript,stderr=subprocess.STDOUT,shell=True)
+            body = str(body[1].replace("\n",""))
+            #print(body2)
+            statusCode='200'
+        except Exception as e:
+            print(e)
+            statusCode='500'
+    elif(reqMethod == 'PUT'):
+        pass
+    elif(reqMethod == 'OPTIONS'):
+        pass
+    elif(reqMethod == 'HEAD'):
+        pass
+    elif(reqMethod == 'POST'):
+        pass
+    elif(reqMethod == 'DELETE'):
+        pass
+    elif(reqMethod == 'TRACE'):
+        pass
+    elif(reqMethod == 'CONNECT'):
+        pass
+    else:
+        body=''
+        statusCode='400'
+    return(statusCode,body)
 
 
 def getfile(http_req):
-	splitreq = http_req.split("\n")
-	print(splitreq)
-	return splitreq[1].split(" ")[1]
-	
-def processRequest(clientRequest):
-	splitreq = clientRequest.split("\n")
-	method = str(splitreq[0].split(" ")[0]).strip()
-	uri = str(splitreq[0].split(" ")[1]).strip()
-	httpVersion = str(splitreq[0].split(" ")[2]).strip()
-	print("Method: "+method)
-	print("URI: "+uri)
-	print("httpVersion: "+httpVersion)
-	
-	exportHeaderList = getHeaders(clientRequest)
-	return processResponse(method,uri,httpVersion,exportHeaderList)
+    splitreq = http_req.split("\n")
+    #print(splitreq)
+    return splitreq[1].split(" ")[1]
 
-def processResponse(method,uri,httpVersion,exportHeaderList):
-	if(uri[0] == '/'):
-		uriparts = getVars(uri)
-		fullFilePath=os.path.abspath(WEBAPP_ROOT+uriparts[0])
-	# 505 Check
-	if(httpVersion not in HTTP_VERSION_SUPPORT):
-		statusCode='505'
-	# 405 Check
-	elif(method not in HTTP_METHODS):
-		statusCode='405'
-	elif(not(os.path.isfile(WEBAPP_ROOT+uriparts[0]))):
-		statusCode='404'
-	else:
-		(statusCode,body) = processMethod(method,exportHeaderList,fullFilePath)
-	
-	if(statusCode != '200'):
-		body="<b>"+statusCode+": </b>"+RESPONSE_CODES[statusCode]
-	
-	response="HTTP/1.1 %s %s\r\n\r\n" % (statusCode,RESPONSE_CODES[statusCode])
-	footer="\r\n\r\n"
-	return (response, body, footer)
+def processRequest(clientRequest):
+    print("CLIENT REQUEST:\n\n"+clientRequest)
+    splitreq = clientRequest.split("\n")
+    method = str(splitreq[0].split(" ")[0]).strip()
+    uri = str(splitreq[0].split(" ")[1]).strip()
+    httpVersion = str(splitreq[0].split(" ")[2]).strip()
+    uriparts = getVars(uri)
+    fullFilePath = os.path.abspath(WEBAPP_ROOT + uriparts[0])
+
+    print("Method: "+method)
+    print("URI: "+uri)
+    print("httpVersion: "+httpVersion)
+    print("fullFilePath: "+fullFilePath)
+    print("uriparts: "+str(uriparts))
+    exportHeaderList = getHeaders(clientRequest,method,fullFilePath,uriparts)
+    print("NEW HEADER LIST:\n\n"+str(exportHeaderList))
+    return processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath)
+
+def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath):
+    # 505 Check
+    if(httpVersion not in HTTP_VERSION_SUPPORT):
+        statusCode='505'
+    # 405 Check
+    elif(method not in HTTP_METHODS):
+        statusCode='405'
+    elif(not(os.path.isfile(WEBAPP_ROOT+uriparts[0]))):
+        statusCode='404'
+    else:
+        (statusCode,body) = processMethod(method,exportHeaderList,fullFilePath)
+
+    if(statusCode != '200'):
+        body="<b>"+statusCode+": </b>"+RESPONSE_CODES[statusCode]
+
+    response="HTTP/1.1 %s %s\r\n\r\n" % (statusCode,RESPONSE_CODES[statusCode])
+    footer="\r\n\r\n"
+    return (response, body, footer)
 
 def requestHandler(clientSock):
-	clientReq=clientSock.recv(1024).decode()
-	
-	(response, body, footer) = processRequest(clientReq)
-	
-	fullResponse ="%s%s%s" % (response,body,footer)
-	
-	clientSock.send(fullResponse.encode())
-	clientSock.close()
-	pass
+    clientReq=clientSock.recv(1024).decode()
+
+    (response, body, footer) = processRequest(clientReq)
+
+    fullResponse ="%s%s%s" % (response,body,footer)
+
+    clientSock.send(fullResponse.encode())
+    clientSock.close()
+    pass
 
 
 # Primary code
 def main():
-        debug_vars(False)
-        # Create socket for communication
-        sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((LISTEN_IP,int(LISTEN_PORT)))
+    # Create socket for communication
+    sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    # Allows reuse of Socket Address
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    # Binds Socket
+    sock.bind((LISTEN_IP,int(LISTEN_PORT)))
 
-        try:
-                sock.listen(int(CONNECTIONS))
+    try:
+        sock.listen(int(CONNECTIONS))
+        while True:
+            print("Waiting for Connection...")
+            (client_socket,client_addr) = sock.accept()
+            # Start Threading Requests
+            threading.Thread(target=requestHandler, args=((client_socket,))).start()
 
-                while True:
-                        print("Waiting for Connection...")
-                        (client_socket,client_addr) = sock.accept()
-                        # Start Threading Requests
-                        threading.Thread(target=requestHandler, args=((client_socket,))).start()
-
-        except (OSError,):
-                print("Exception Caught")
-                sock.close()
-                pass
+    except (OSError,):
+        print("Exception Caught")
+        sock.close()
+        pass
 
 # Execute Server
 main()
