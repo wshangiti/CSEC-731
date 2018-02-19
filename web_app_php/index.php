@@ -1,5 +1,6 @@
 <?php
 
+
 session_start();
 //first: check if user is logged in
 
@@ -16,18 +17,24 @@ session_start();
 
       //option2: user clicked on update
       if(isset($_POST['update'])){
-        //save session
-        $_SESSION["fname"] = $_POST['fname'];
-        $_SESSION["lname"] = $_POST['lname'];
-        $_SESSION["pass"] = $_POST['pass'];
-        $_SESSION["cell"] = $_POST['cell'];
+        //read POST
+        $fname = $_POST['fname'];
+        $lname = $_POST['lname'];
+        $pass = $_POST['pass'];
+        $cell = $_POST['cell'];
+        //user info in session
+        $loginUsername = $_SESSION["username"];
+        $loginPassword = $_SESSION["pass"];
 
         //save new information to database
-        $status = setUserInfo($_SESSION["fname"], $_SESSION["lname"], $_SESSION["pass"], $_SESSION["cell"]);
+        $status = setUserInfo($fname, $lname, $pass, $cell, $loginUsername, $loginPassword);
 
         if($status == true){
-          //update has been successful
-          $message = "Update was successful";
+          //update session
+            $_SESSION["fname"] = $fname;
+            $_SESSION["lname"] = $lname;
+            $_SESSION["pass"] = $pass;
+            $_SESSION["cell"] = $cell;
         }
         else{
           //update was NOT successful
@@ -65,21 +72,24 @@ session_start();
         //no errors
 
           //check if user/password is correct
+          $sql = "SELECT * FROM User WHERE username = '" . $username . "' AND password = '" . $pass . "'";
+
+          //execute
+          $result = executeSQLSelect($sql);
 
           //1. check username/pass in database
-          $dbstatus = true;
-
-          if($dbstatus){
+          if(count($result)>0){
+              $row = $result[0];
               //if correct
-               $fname2 = "weeam";
-               $lname2 = "alshangiti";
-               $pass2 = "mypass";
-               $cell2 = "5403130402";
+               $fname2 = $row["fname"];
+               $lname2 = $row["lname"];
+               $cell2 = $row["cell"];
               //save session
               $_SESSION["isLoggedIn"] = true;
               $_SESSION["fname"] = $fname2;
               $_SESSION["lname"] = $lname2;
-              $_SESSION["pass"] = $pass2;
+              $_SESSION["username"] = $username;
+              $_SESSION["pass"] = $pass;
               $_SESSION["cell"] = $cell2;
               header("Refresh:0");
           }
@@ -93,16 +103,11 @@ session_start();
 
   }
 
-function setUserInfo($fname, $lname, $pass, $cell){
+function setUserInfo($fname, $lname, $pass, $cell, $loginUsername, $loginPassword){
   //save to DB
-  return true;
-}
-function getUserInfo(){
-  $info = array('fname' => $fname,
-                'lname' => $lname,
-                'pass'  => $pass, 
-                'cell' => $cell);
-  return $info;
+  $sql = "UPDATE User SET password = '$pass', fname='$fname', lname='$lname', cell='$cell' WHERE username = '$loginUsername' AND password = '$loginPassword' ";
+
+  return executeSQLUpdate($sql);
 }
 
 function logout()
@@ -176,4 +181,80 @@ function getProfileHTML($firstname, $lastname, $password, $cell, $message)
           </body>
         </html>";
 }
+
+
+
+
+
+function executeSQLSelect($sql)
+{
+  $servername = "localhost";
+  $username = "root";
+  $password = "root";
+  $dbname = "webapp";
+
+  // Create connection
+  $conn = new mysqli($servername, $username, $password, $dbname);
+
+  // Check connection
+  if ($conn->connect_error) {
+      die("Connection failed: " . $conn->connect_error);
+  } 
+
+  
+  $result = $conn->query($sql);
+  $data = array();
+
+  if ($result->num_rows > 0) {
+    while($row = $result->fetch_assoc()){
+      $data[] = $row;
+    }
+  } 
+
+  //close connection
+  $conn->close();
+
+  return $data;
+}//end of function
+
+
+
+
+
+
+function executeSQLUpdate($sql)
+{
+  $servername = "localhost";
+  $username = "root";
+  $password = "root";
+  $dbname = "webapp";
+
+  // Create connection
+  $conn = new mysqli($servername, $username, $password, $dbname);
+
+  // Check connection
+  if ($conn->connect_error) {
+      die("Connection failed: " . $conn->connect_error);
+  } 
+
+  //execite
+  $result = $conn->query($sql);
+
+  //check if update was successful
+  //$count = mysqli_affected_rows($con);
+  $count = $conn->affected_rows;
+  $status = false;
+  if ($count > 0) {
+    $status = true;
+  } 
+
+  //close connection
+  $conn->close();
+
+  return $status;
+}//end of function
+
+
+
+
 ?>
