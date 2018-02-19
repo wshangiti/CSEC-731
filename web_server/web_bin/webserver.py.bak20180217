@@ -20,25 +20,61 @@ WEBAPP_ROOT = WEBAPP_ROOT.rstrip('/')
 log_date = datetime.datetime.now().strftime("%Y_%m_%d")
 
 ###### Primary functions
+# Function to log requesti
+#def getmethod(http_req):
+#	splitreq = http_req.split("\n")
+#	method = str(splitreq[0].split(" "))
+#	print("GetMethod: SplitReq: "+str(splitreq))
+#	print("GetMethod: "+method)
+#	return method
+
+#def getfile(http_req):
+#	splitreq = http_req.split("\n")
+#	print("GetFile: SplitReq: "+str(splitreq))
+#	return splitreq[0].split(" ")[1]
 
 def getHeaders(http_req):
+	#print(type(http_req))
 	exportList=''
 	splitreq = http_req.split("\n")
+	#print(splitreq)
 	headerlist = []
 	headernum = 1
+	#print(splitreq)
 	while splitreq[headernum] != "\r":
+		#print("HeaderNum: " + str(headernum))
+		#print("HeaderSplit: " + splitreq[headernum])
+		#headerparts = re.split('(: )',splitreq[headernum])
 		headerparts = splitreq[headernum].split(":")
+		#print(headerparts)
 		if(len(headerparts) == 3):
 			headerparts[1] = headerparts[1]+':'+headerparts[2]
+		#print("Key: %s, Value: %s" % (headerparts[0], headerparts[1]))
 		for hmap in HTTP_BASH_MAP:
 			if(hmap[0] == headerparts[0]):
 				headerparts[1]=(headerparts[1].strip('\r')).strip()
+				#print("Map is: " + hmap[0])
+				#print("%s=%s" % (headerparts[0],headerparts[2]))
+				#print('export %s=\'%s\';' % (map[1],headerparts[1]))
+				#print('export %s=\'%s\';' % (HTTP_BASH_MAP[map],headerparts[1]))
+				#exportList += ("export %s=\'%s\';" % (HTTP_BASH_MAP[hmap],headerparts[1]))
 				exportList += "export %s='%s'; " % (hmap[1],headerparts[1])
 				headerlist.append(hmap[1])
+				#print(exportList)
+				#print(exportList)
+		#headernum=headernum+1
+		#headerlist.append(spitreq[headernum])
+		#print("%s=%s" % (headerparts[0], headerparts[1]))
 		headernum += 1
+	#return headerlist
+	#print("##########################################################")
+	#print(exportList)
+	#print(headerlist)
+	#print("##########################################################")
 	return exportList;
 
 def getCGIHeaders(http_req):
+	#print(http_req)
 	exportList=''
 	splitreq = http_req.split("\\n")
 	headerlist = []
@@ -49,6 +85,8 @@ def getCGIHeaders(http_req):
 			if(hmap[0] == headerparts[0]):
 				headerparts[1]=(headerparts[1].strip('\\r')).strip()
 				exportList += "export %s='%s'; " % (hmap[1],headerparts[1])
+				#headerlist.append(hmap[1])
+		#headerlist.append(spitreq[headernum])
 		headernum += 1
 	return exportList;
 
@@ -85,14 +123,26 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath):
 		runscript += " export HTTP_HOST='%s';" %('127.0.0.1')
 		#if()		
 		#runscript += "export QUERY_STRING='%s';" (uriparts[1])
+		#runscript = "php-cgi -f %s%s"  % (WEBAPP_ROOT,uriparts[0])
 		runscript += "php-cgi -f %s"  % (fullFilePath)
 		try:
+			#print(runscript)	
 			body = str(subprocess.check_output(runscript,stderr=subprocess.STDOUT,shell=True))
+			#print(body)
 			body = body.strip('^b"').split("\\r\\n\\r\\n")
+			#print(body[0])
 			moreHeaderList = getCGIHeaders(body[0])
 			subprocess.check_output(moreHeaderList,stderr=subprocess.STDOUT,shell=True)
+			#print(moreHeaderList)
+			#exit(0)
+			#body = subprocess.check_output(runscript,shell=True)
+			#print(type(body))
+			#body = body[1].strip('\n')
+			#body = str(body[1]).strip("\n\n")
 			body = str(body[1].replace("\\n",""))
-			#print(body)
+			#body3 = body2.strip('\n')
+			#print(body2)
+			print(body)
 			statusCode='200'
 		except Exception as e:
 			print(e)
@@ -124,6 +174,7 @@ def getfile(http_req):
 	
 def processRequest(clientRequest):
 	splitreq = clientRequest.split("\n")
+	#print("GetMethod: SplitReq: "+str(splitreq))
 	method = str(splitreq[0].split(" ")[0]).strip()
 	uri = str(splitreq[0].split(" ")[1]).strip()
 	httpVersion = str(splitreq[0].split(" ")[2]).strip()
@@ -135,6 +186,7 @@ def processRequest(clientRequest):
 	return processResponse(method,uri,httpVersion,exportHeaderList)
 
 def processResponse(method,uri,httpVersion,exportHeaderList):
+	#httpVersion = 'bob'
 	if(uri[0] == '/'):
 		uriparts = getVars(uri)
 		fullFilePath=os.path.abspath(WEBAPP_ROOT+uriparts[0])
@@ -153,16 +205,35 @@ def processResponse(method,uri,httpVersion,exportHeaderList):
 		body="<b>"+statusCode+": </b>"+RESPONSE_CODES[statusCode]
 	
 	response="HTTP/1.1 %s %s\r\n\r\n" % (statusCode,RESPONSE_CODES[statusCode])
+	#print("Response is : "+ response)
 	footer="\r\n\r\n"
 	return (response, body, footer)
 
 def requestHandler(clientSock):
+        #print("Reached response Handler")
 	clientReq=clientSock.recv(1024).decode()
+	#method= getmethod(clientReq)
+	#file = getfile(clientReq)
+	#elist = getHeaders(clientReq)
+	#print("Method: " + method)
+	#print("Headers: " + elist)
+	#headers = getHeaders(request)
+	#print("File: " + uriparts[0])
+	#print("Vars: " + uriparts[1])
+	#runscript = "%s export REQUEST_METHOD='%s';" (elist, method)
+	#runscript += "export QUERY_STRING='%s';" (vars)
+	#runscript += "export SCRIPT_FILENAME='%s%s';"  % (doc_root,uriparts[0])
+	#runscript += "php-cgi -f %s%s"  % (doc_root,uriparts[0])
 	
+
 	(response, body, footer) = processRequest(clientReq)
 	
+        # Combine full reponse  
+	#fullResponse =bytes(("%s%s%s" % (response,body,footer)),'UTF-8')
 	fullResponse ="%s%s%s" % (response,body,footer)
-	
+	#fullResponse =str("%s%s%s" % (response,body,footer))
+	#print("%s%s%s" % (response,body,footer))
+	#print(fullResponse)    
 	clientSock.send(fullResponse.encode())
 	clientSock.close()
 	pass
@@ -177,13 +248,19 @@ def main():
         sock.bind((LISTEN_IP,int(LISTEN_PORT)))
 
         try:
-                sock.listen(int(CONNECTIONS))
+                #sock.listen(0)
+                sock.listen(10)
+                #sock.listen(int(CONNECTIONS))
 
                 while True:
                         print("Waiting for Connection...")
                         (client_socket,client_addr) = sock.accept()
+                        #print(client_addr[0])
+                        #print(client_addr[1])
+                        #print((client_socket,))        
                         # Start Threading Requests
                         threading.Thread(target=requestHandler, args=((client_socket,))).start()
+
 
         except (OSError,):
                 print("Exception Caught")
@@ -191,4 +268,5 @@ def main():
                 pass
 
 # Execute Server
+
 main()
