@@ -68,13 +68,8 @@ def getVars(uri):
 
 def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,destPort):
     time_stamp = datetime.datetime.now().strftime("%Y-%m-%d::%H:%M:%S")
-    if not os.path.exists('LOG_REQUEST_BAD'):
-        open('LOG_REQUEST_BAD', 'w').close()
-    if not os.path.exists('LOG_REQUEST_GOOD'):
-        open('LOG_REQUEST_GOOD', 'w').close()
 
     logstring="%s Source:%s:%s Destination:%s:%s \"%s %s\" %s %s\r\n" %(time_stamp,sourceIP,sourcePort,destIP,destPort,method,uri,httpVersion,statusCode)
-
     # If log files doent exist create them
     if (statusCode != '200'):
         file = open(LOG_REQUEST_BAD, "a")
