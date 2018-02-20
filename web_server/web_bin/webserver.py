@@ -5,8 +5,8 @@ import os # Forcommand line execution
 import threading # Conncurrent client connections
 import datetime # Used for logging
 import subprocess # Used for Subprocessing
-#import re # For RegExpressions
-# TEST
+import re # For RegExpressions
+
 
 # Import primary configuration File
 server_config_file="../web_etc/server.config"
@@ -15,21 +15,23 @@ exec(open(server_config_file).read())
 exec(open(app_config_file).read())
 # Parse ConfigFile Variables
 WEBAPP_ROOT = WEBAPP_ROOT.rstrip('/')
-
+#print("WEBAPP_ROOT: "+ WEBAPP_ROOT)
 ##########################################################
 
 ###### Primary functions
 
 def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
-
     splitreq = http_req.split("\n")
     headerlist = []
     headernum = 0
 
+    print("----------------------\n\n%s\n\n-----------\n\n" % str(splitreq))
     while splitreq[headernum] != "\r":
         headerparts = splitreq[headernum].split(": ")
         for hmap in HTTP_BASH_MAP:
             if(hmap[0] == headerparts[0]):
+                print(([hmap[0] + " ============== " + headerparts[0]]))
+                print(([hmap[1]+" +++++++++ "+ headerparts[1]]))
                 headerparts[1]=(headerparts[1].strip('\r')).strip()
                 headerlist.append(([hmap[1],headerparts[1]]))
         headernum += 1
@@ -81,21 +83,23 @@ def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,des
         file.write(logstring)
         file.close()
 
-def processMethod(reqMethod,exportHeaderList,fullFilePath):
+
+
+def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody):
     if(reqMethod == 'GET'):
         print("REACHED: GET")
         executeMethod = "php-cgi -f %s" % (fullFilePath)
     elif(reqMethod == 'PUT'):
+        print("REACHED: PUT")
         pass
     elif(reqMethod == 'OPTIONS'):
         pass
     elif(reqMethod == 'HEAD'):
-        executeMethod =''
         pass
     elif(reqMethod == 'POST'):
         print("REACHED: POST")
-
-        executeMethod = "exec echo\"$BODY\" | php-cgi"
+        exportHeaderList.append((['BODY',postBody]))
+        executeMethod = "echo $BODY | php-cgi"
         pass
     elif(reqMethod == 'DELETE'):
         pass
@@ -106,13 +110,14 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath):
     else:
         body=''
         statusCode='400'
-        executeMethod=''
 
     runscript = ''
     for hmap in exportHeaderList:
         print("export %s='%s'; " % (hmap[0], hmap[1]))
         runscript += "export %s='%s'; " % (hmap[0], hmap[1])
     runscript += executeMethod
+    print("RUN SCRIPT\n\n%s\n\n" % str(runscript))
+
     try:
         body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True))
         #print("ORIGBODY: \n\n" + body)
@@ -144,22 +149,26 @@ def getfile(http_req):
 def processRequest(clientRequest,sourceIP,sourcePort,destIP,destPort):
     print("CLIENT REQUEST:\n\n"+clientRequest)
     splitreq = clientRequest.split("\n")
+    print(str(splitreq[0]))
     method = str(splitreq[0].split(" ")[0]).strip()
     uri = str(splitreq[0].split(" ")[1]).strip()
     httpVersion = str(splitreq[0].split(" ")[2]).strip()
     uriparts = getVars(uri)
     fullFilePath = os.path.abspath(WEBAPP_ROOT + uriparts[0])
 
+    postBody = splitreq[-1]
+    print("POST BODY: "+ str(postBody))
+    print(str(splitreq))
     print("Method: "+method)
     print("URI: "+uri)
     print("httpVersion: "+httpVersion)
     print("fullFilePath: "+fullFilePath)
     print("uriparts: "+str(uriparts))
     exportHeaderList = getHeaders(clientRequest,method,fullFilePath,uriparts)
-    print("HEADER LIST:\n\n"+str(exportHeaderList))
-    return processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort)
+    print("NEW HEADER LIST:\n\n"+str(exportHeaderList))
+    return processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort,postBody)
 
-def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort):
+def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort,postBody):
     # 505 Check
     if(httpVersion not in HTTP_VERSION_SUPPORT):
         statusCode='505'
@@ -169,7 +178,7 @@ def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,ur
     elif(not(os.path.isfile(WEBAPP_ROOT+uriparts[0]))):
         statusCode='404'
     else:
-        (statusCode,body) = processMethod(method,exportHeaderList,fullFilePath)
+        (statusCode,body) = processMethod(method,exportHeaderList,fullFilePath,postBody)
 
     if(statusCode != '200'):
         body="<b>"+statusCode+": </b>"+RESPONSE_CODES[statusCode]
@@ -187,7 +196,7 @@ def requestHandler(clientSock):
     destIP= clientSock.getsockname()[0]
     destPort= clientSock.getsockname()[1]
 
-    #print("SOURCE IP: "+ sourceIP)
+    print("SOURCE IP: "+ sourceIP)
 
     (response, body, footer) = processRequest(clientReq,sourceIP,sourcePort,destIP,destPort)
 
