@@ -5,7 +5,7 @@ import os # Forcommand line execution
 import threading # Conncurrent client connections
 import datetime # Used for logging
 import subprocess # Used for Subprocessing
-import re # For RegExpressions
+#import re # For RegExpressions
 # TEST
 
 # Import primary configuration File
@@ -15,7 +15,7 @@ exec(open(server_config_file).read())
 exec(open(app_config_file).read())
 # Parse ConfigFile Variables
 WEBAPP_ROOT = WEBAPP_ROOT.rstrip('/')
-#print("WEBAPP_ROOT: "+ WEBAPP_ROOT)
+
 ##########################################################
 
 ###### Primary functions
@@ -81,44 +81,21 @@ def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,des
         file.write(logstring)
         file.close()
 
-
-
 def processMethod(reqMethod,exportHeaderList,fullFilePath):
     if(reqMethod == 'GET'):
         print("REACHED: GET")
         executeMethod = "php-cgi -f %s" % (fullFilePath)
-
-        runscript=''
-        for hmap in exportHeaderList:
-            print("export %s='%s'; " % (hmap[0], hmap[1]))
-            runscript += "export %s='%s'; " % (hmap[0], hmap[1])
-        runscript += executeMethod
-        try:
-            body = str(subprocess.check_output(runscript,stderr=subprocess.STDOUT,shell=True))
-            print("ORIGBODY: \n\n"+body)
-            body = body.strip('^b"').split("\r\n\r\n")
-            #print(body)
-            moreHeaderList = getCGIHeaders(body[0])
-            extrarunscript = ''
-            for hmap in moreHeaderList:
-                print("export %s='%s'; " % (hmap[0], hmap[1]))
-                extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
-            print(extrarunscript)
-            body2 = subprocess.check_output(extrarunscript,stderr=subprocess.STDOUT,shell=True)
-            body = str(body[1].replace("\n",""))
-            #print(body2)
-            statusCode='200'
-        except Exception as e:
-            print(e)
-            statusCode='500'
-            body=''
     elif(reqMethod == 'PUT'):
         pass
     elif(reqMethod == 'OPTIONS'):
         pass
     elif(reqMethod == 'HEAD'):
+        executeMethod =''
         pass
     elif(reqMethod == 'POST'):
+        print("REACHED: POST")
+
+        executeMethod = "exec echo\"$BODY\" | php-cgi"
         pass
     elif(reqMethod == 'DELETE'):
         pass
@@ -129,6 +106,33 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath):
     else:
         body=''
         statusCode='400'
+        executeMethod=''
+
+    runscript = ''
+    for hmap in exportHeaderList:
+        print("export %s='%s'; " % (hmap[0], hmap[1]))
+        runscript += "export %s='%s'; " % (hmap[0], hmap[1])
+    runscript += executeMethod
+    try:
+        body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True))
+        #print("ORIGBODY: \n\n" + body)
+        body = body.strip('^b"').split("\r\n\r\n")
+        # print(body)
+        moreHeaderList = getCGIHeaders(body[0])
+        extrarunscript = ''
+        for hmap in moreHeaderList:
+            print("export %s='%s'; " % (hmap[0], hmap[1]))
+            extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
+        #print(extrarunscript)
+        body2 = subprocess.check_output(extrarunscript, stderr=subprocess.STDOUT, shell=True)
+        body = str(body[1].replace("\n", ""))
+        # print(body2)
+        statusCode = '200'
+    except Exception as e:
+        print(e)
+        statusCode = '500'
+        body = ''
+
     return(statusCode,body)
 
 
@@ -152,7 +156,7 @@ def processRequest(clientRequest,sourceIP,sourcePort,destIP,destPort):
     print("fullFilePath: "+fullFilePath)
     print("uriparts: "+str(uriparts))
     exportHeaderList = getHeaders(clientRequest,method,fullFilePath,uriparts)
-    print("NEW HEADER LIST:\n\n"+str(exportHeaderList))
+    print("HEADER LIST:\n\n"+str(exportHeaderList))
     return processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort)
 
 def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort):
@@ -183,7 +187,7 @@ def requestHandler(clientSock):
     destIP= clientSock.getsockname()[0]
     destPort= clientSock.getsockname()[1]
 
-    print("SOURCE IP: "+ sourceIP)
+    #print("SOURCE IP: "+ sourceIP)
 
     (response, body, footer) = processRequest(clientReq,sourceIP,sourcePort,destIP,destPort)
 
