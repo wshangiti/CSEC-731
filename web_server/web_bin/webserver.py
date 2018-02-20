@@ -21,15 +21,17 @@ WEBAPP_ROOT = WEBAPP_ROOT.rstrip('/')
 ###### Primary functions
 
 def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
-
     splitreq = http_req.split("\n")
     headerlist = []
     headernum = 0
 
+    print("----------------------\n\n%s\n\n-----------\n\n" % str(splitreq))
     while splitreq[headernum] != "\r":
         headerparts = splitreq[headernum].split(": ")
         for hmap in HTTP_BASH_MAP:
             if(hmap[0] == headerparts[0]):
+                print(([hmap[0] + " ============== " + headerparts[0]]))
+                print(([hmap[1]+" +++++++++ "+ headerparts[1]]))
                 headerparts[1]=(headerparts[1].strip('\r')).strip()
                 headerlist.append(([hmap[1],headerparts[1]]))
         headernum += 1
@@ -83,42 +85,21 @@ def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,des
 
 
 
-def processMethod(reqMethod,exportHeaderList,fullFilePath):
+def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody):
     if(reqMethod == 'GET'):
         print("REACHED: GET")
         executeMethod = "php-cgi -f %s" % (fullFilePath)
-
-        runscript=''
-        for hmap in exportHeaderList:
-            print("export %s='%s'; " % (hmap[0], hmap[1]))
-            runscript += "export %s='%s'; " % (hmap[0], hmap[1])
-        runscript += executeMethod
-        try:
-            body = str(subprocess.check_output(runscript,stderr=subprocess.STDOUT,shell=True))
-            print("ORIGBODY: \n\n"+body)
-            body = body.strip('^b"').split("\r\n\r\n")
-            #print(body)
-            moreHeaderList = getCGIHeaders(body[0])
-            extrarunscript = ''
-            for hmap in moreHeaderList:
-                print("export %s='%s'; " % (hmap[0], hmap[1]))
-                extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
-            print(extrarunscript)
-            body2 = subprocess.check_output(extrarunscript,stderr=subprocess.STDOUT,shell=True)
-            body = str(body[1].replace("\n",""))
-            #print(body2)
-            statusCode='200'
-        except Exception as e:
-            print(e)
-            statusCode='500'
-            body=''
     elif(reqMethod == 'PUT'):
+        print("REACHED: PUT")
         pass
     elif(reqMethod == 'OPTIONS'):
         pass
     elif(reqMethod == 'HEAD'):
         pass
     elif(reqMethod == 'POST'):
+        print("REACHED: POST")
+        exportHeaderList.append((['BODY',postBody]))
+        executeMethod = "echo $BODY | php-cgi"
         pass
     elif(reqMethod == 'DELETE'):
         pass
@@ -129,6 +110,34 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath):
     else:
         body=''
         statusCode='400'
+
+    runscript = ''
+    for hmap in exportHeaderList:
+        print("export %s='%s'; " % (hmap[0], hmap[1]))
+        runscript += "export %s='%s'; " % (hmap[0], hmap[1])
+    runscript += executeMethod
+    print("RUN SCRIPT\n\n%s\n\n" % str(runscript))
+
+    try:
+        body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True))
+        #print("ORIGBODY: \n\n" + body)
+        body = body.strip('^b"').split("\r\n\r\n")
+        # print(body)
+        moreHeaderList = getCGIHeaders(body[0])
+        extrarunscript = ''
+        for hmap in moreHeaderList:
+            print("export %s='%s'; " % (hmap[0], hmap[1]))
+            extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
+        #print(extrarunscript)
+        body2 = subprocess.check_output(extrarunscript, stderr=subprocess.STDOUT, shell=True)
+        body = str(body[1].replace("\n", ""))
+        # print(body2)
+        statusCode = '200'
+    except Exception as e:
+        print(e)
+        statusCode = '500'
+        body = ''
+
     return(statusCode,body)
 
 
@@ -140,12 +149,16 @@ def getfile(http_req):
 def processRequest(clientRequest,sourceIP,sourcePort,destIP,destPort):
     print("CLIENT REQUEST:\n\n"+clientRequest)
     splitreq = clientRequest.split("\n")
+    print(str(splitreq[0]))
     method = str(splitreq[0].split(" ")[0]).strip()
     uri = str(splitreq[0].split(" ")[1]).strip()
     httpVersion = str(splitreq[0].split(" ")[2]).strip()
     uriparts = getVars(uri)
     fullFilePath = os.path.abspath(WEBAPP_ROOT + uriparts[0])
 
+    postBody = splitreq[-1]
+    print("POST BODY: "+ str(postBody))
+    print(str(splitreq))
     print("Method: "+method)
     print("URI: "+uri)
     print("httpVersion: "+httpVersion)
@@ -153,9 +166,9 @@ def processRequest(clientRequest,sourceIP,sourcePort,destIP,destPort):
     print("uriparts: "+str(uriparts))
     exportHeaderList = getHeaders(clientRequest,method,fullFilePath,uriparts)
     print("NEW HEADER LIST:\n\n"+str(exportHeaderList))
-    return processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort)
+    return processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort,postBody)
 
-def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort):
+def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,uri,sourceIP,sourcePort,destIP,destPort,postBody):
     # 505 Check
     if(httpVersion not in HTTP_VERSION_SUPPORT):
         statusCode='505'
@@ -165,7 +178,7 @@ def processResponse(method,uriparts,httpVersion,exportHeaderList,fullFilePath,ur
     elif(not(os.path.isfile(WEBAPP_ROOT+uriparts[0]))):
         statusCode='404'
     else:
-        (statusCode,body) = processMethod(method,exportHeaderList,fullFilePath)
+        (statusCode,body) = processMethod(method,exportHeaderList,fullFilePath,postBody)
 
     if(statusCode != '200'):
         body="<b>"+statusCode+": </b>"+RESPONSE_CODES[statusCode]
