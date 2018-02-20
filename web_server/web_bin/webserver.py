@@ -6,7 +6,7 @@ import threading # Conncurrent client connections
 import datetime # Used for logging
 import subprocess # Used for Subprocessing
 import re # For RegExpressions
-# TEST
+
 
 # Import primary configuration File
 server_config_file="../web_etc/server.config"
