@@ -35,6 +35,7 @@ session_start();
             $_SESSION["lname"] = $lname;
             $_SESSION["pass"] = $pass;
             $_SESSION["cell"] = $cell;
+            $message = "Thank you, update was successful";
         }
         else{
           //update was NOT successful
