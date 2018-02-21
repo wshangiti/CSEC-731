@@ -26,7 +26,6 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
     headerlist = []
     headernum = 0
 
-    print("----------------------\n\n%s\n\n-----------\n\n" % str(splitreq))
     while splitreq[headernum] != "\r":
         headerparts = splitreq[headernum].split(": ")
         for hmap in HTTP_BASH_MAP:
@@ -34,7 +33,9 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
                 headerparts[1]=(headerparts[1].strip('\r')).strip()
                 headerlist.append(([hmap[1],headerparts[1]]))
                 if(hmap[0] == 'User-Agent'):
-                        userAgent = headerparts[1]
+                    userAgent = headerparts[1]
+                else:
+                    userAgent = ''
         headernum += 1
     headerlist += DEFAULT_EXPORTS
     if(len(uriparts) > 1):
@@ -88,20 +89,29 @@ def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,des
         file.write(logstring)
         file.close()
 
-def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody):
-    if(reqMethod == 'GET'):
-        executeMethod = "php-cgi -f %s" % (fullFilePath)
+def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
+    # Process Method
+    if(reqMethod == 'HEAD'):
+        executeMethod=''
+        pass
+    elif(reqMethod == 'GET' or reqMethod == 'POST'):
+        if(reqMethod == 'GET'):
+            executeMethod = "%s -f %s" % (cgiParser,fullFilePath)
+        else: # IF POST
+            exportHeaderList.append((['BODY', postBody]))
+            executeMethod = "echo $BODY | %s" % cgiParser
     elif(reqMethod == 'PUT'):
-        print("REACHED: PUT")
         pass
     elif(reqMethod == 'OPTIONS'):
-        pass
-    elif(reqMethod == 'HEAD'):
-        pass
-    elif(reqMethod == 'POST'):
-        exportHeaderList.append((['BODY',postBody]))
-        executeMethod = "echo $BODY | php-cgi"
-        pass
+        acceptString = "Allow:"
+        for meth in HTTP_METHODS:
+            acceptString += " %s," % (meth)
+        # REMOVE TRAILING COMMA
+        acceptString = acceptString[:-1]
+        if(DEBUG):
+            print(acceptString)
+        statusCode = '200'
+        return (statusCode, body)
     elif(reqMethod == 'DELETE'):
         pass
     elif(reqMethod == 'TRACE'):
@@ -111,6 +121,7 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody):
     else:
         statusCode='405'
 
+    # Process Headers
     runscript = ''
     print(str(exportHeaderList))
     for hmap in exportHeaderList:
@@ -121,11 +132,11 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody):
 
     try:
         body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True))
-        if(DEBUG):
+        if (DEBUG):
             print("ORIGBODY: \n\n" + body)
         body = body.strip('^b"').split("\r\n\r\n")
-        if(DEBUG):
-            print("NEW STRIPPED BODY: "+str(body))
+        if (DEBUG):
+            print("NEW STRIPPED BODY: " + str(body))
 
         # Process headers returned from CGI
         moreHeaderList = getCGIHeaders(body[0])
@@ -133,7 +144,7 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody):
         for hmap in moreHeaderList:
             print("export %s='%s'; " % (hmap[0], hmap[1]))
             extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
-        if(DEBUG):
+        if (DEBUG):
             print(extrarunscript)
         subprocess.check_output(extrarunscript, stderr=subprocess.STDOUT, shell=True)
         body = str(body[1].replace("\n", ""))
@@ -152,13 +163,25 @@ def processRequest(clientRequest):
     splitreq = clientRequest.split("\n")
     method = str(splitreq[0].split(" ")[0]).strip()
     uri = str(splitreq[0].split(" ")[1]).strip()
+
     httpVersion = str(splitreq[0].split(" ")[2]).strip()
     uriparts = getVars(uri)
-    fullFilePath = os.path.abspath(WEBAPP_ROOT + uriparts[0])
+
+    if(method == "GET" or method == "POST"):
+        cgiParser = DEFAULT_CGI[method]
+    else:
+        cgiParser = ''
+
+    # Checks if URI = *; primarily for options request
+    if(uri != "*"):
+        fullFilePath = os.path.abspath(WEBAPP_ROOT + uriparts[0])
+    else:
+        fullFilePath = uri
     postBody = splitreq[-1]
     (exportHeaderList,userAgent) = getHeaders(clientRequest,method,fullFilePath,uriparts)
     if(DEBUG):
         print(str(splitreq[0]))
+        print("cgiParserCommand: "+ cgiParser)
         print("CLIENT REQUEST:\n\n" + clientRequest)
         print("POST BODY: "+ str(postBody))
         print(str(splitreq))
@@ -168,7 +191,6 @@ def processRequest(clientRequest):
         print("fullFilePath: "+fullFilePath)
         print("uriparts: "+str(uriparts))
         print("NEW HEADER LIST:\n\n"+str(exportHeaderList))
-
     # 505 Check
     if (httpVersion not in HTTP_VERSION_SUPPORT):
         statusCode = '505'
@@ -178,7 +200,7 @@ def processRequest(clientRequest):
     elif (not (os.path.isfile(WEBAPP_ROOT + uriparts[0]))):
         statusCode = '404'
     else:
-        (statusCode, body) = processMethod(method, exportHeaderList, fullFilePath, postBody)
+        (statusCode, body) = processMethod(method, exportHeaderList, fullFilePath, postBody,cgiParser)
 
     #If status code of request is not 'OK', then set response body
     if (statusCode != '200'):
