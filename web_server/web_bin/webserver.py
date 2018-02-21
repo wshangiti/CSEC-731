@@ -148,6 +148,10 @@ def getfile(http_req):
 
 def processRequest(clientRequest,sourceIP,sourcePort,destIP,destPort):
     print("CLIENT REQUEST:\n\n"+clientRequest)
+
+    # Fixes stupid firefox \\r\\n BS...works in chrome no issues
+    clientRequest = clientRequest.replace("\\\\", "\\")
+    print("CLIENT REQUEST:\n\n" + clientRequest)
     splitreq = clientRequest.split("\n")
     print(str(splitreq[0]))
     method = str(splitreq[0].split(" ")[0]).strip()
