@@ -96,7 +96,7 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
         pass
     elif(reqMethod == 'GET' or reqMethod == 'POST'):
         if(reqMethod == 'GET'):
-            executeMethod = "%s -f %s" % (cgiParser,fullFilePath)
+            executeMethod = "%s %s" % (cgiParser,fullFilePath)
         else: # IF POST
             exportHeaderList.append((['BODY', postBody]))
             executeMethod = "echo $BODY | %s" % cgiParser
