@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Feb 21, 2018 at 03:49 PM
+-- Generation Time: Feb 21, 2018 at 08:02 PM
 -- Server version: 5.6.38
 -- PHP Version: 7.2.1
 
@@ -21,7 +21,7 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `user` (
-  `username` varchar(50) NOT NULL,
+  `username` varchar(100) NOT NULL,
   `password` varchar(50) NOT NULL,
   `fname` varchar(50) NOT NULL,
   `lname` varchar(50) NOT NULL,
@@ -33,11 +33,9 @@ CREATE TABLE `user` (
 --
 
 INSERT INTO `user` (`username`, `password`, `fname`, `lname`, `cell`) VALUES
-('mshangiti', 'ccc', 'Layan', 'shang', '1234'),
-('Rob', '123', 'Rob', 'Olson', '123456'),
-('Steve', '123', 'Steve', 'Mihm', '123456'),
-('waleed', 'hi9', 'waleed', 'alshangiti', '5402'),
-('wshangiti', '123', 'Weeam', 'was', '123456');
+('Rob.Olson@rit.edu', 'abcd1234', 'Rob', 'Oslon', '585654321'),
+('slm8038@rit.edu', 'abcd1234', 'Steven', 'Mihm', '585123456'),
+('waa8642@rit.edu', 'abcd1234', 'Weeam', 'Alshangiti', '54031304001');
 
 --
 -- Indexes for dumped tables

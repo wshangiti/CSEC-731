@@ -138,12 +138,12 @@ function getLoginHTML($message="")
           <section class='container'>
             <div class='login'>
               <h1>*** Login to Web App ***</h1>
-                <form method='GET' action='./'>
-                  <p>Username:   <input type='text' name='username' ></p>
-                  <p>Password:   <input type='password' name='password'></p>
-                  <p class='submit'><input type='submit'  value='Login' >  </p>
+                <form method='GET' action='./' id='loginForm'>
+                <div><span>Email:</span><input type='text' name='username' ></div>
+                <div><span>Password:</span><input type='password' name='password'></div>
+                  <p class='submit'><input type='submit'  value='Login' id='login'>  </p>
                 </form>
-                <p style='color:red;text-align:center;'>$message</p>
+                <p style='color:red;text-align:center;' id ='loginMessage'>$message</p>
             </div>  
           </section> 
         </body>
@@ -158,6 +158,8 @@ function getProfileHTML($firstname, $lastname, $password, $cell, $message)
           <head> 
               <title>Profile Form</title>
               <link rel='stylesheet' href='./css/style.css'>
+              <script src='./js/jquery-3.3.1.min.js'></script>
+              <script src='./js/mycode.js'></script>
           </head>
           <body>
             <section class='container'>
