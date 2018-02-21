@@ -6,8 +6,8 @@ import threading # Conncurrent client connections
 import datetime # Used for logging
 import subprocess # Used for Subprocessing
 import re # For RegExpressions
-
-
+import platform
+print(platform.python_version())
 # Import primary configuration File
 server_config_file="../web_etc/server.config"
 app_config_file="../web_etc/app.config"
@@ -131,7 +131,7 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
     print("RUN SCRIPT\n\n%s\n\n" % str(runscript))
 
     try:
-        body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True))
+        body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True),'UTF-8')
         if (DEBUG):
             print("ORIGBODY: \n\n" + body)
         body = body.strip('^b"').split("\r\n\r\n")
@@ -158,7 +158,7 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
 
 def processRequest(clientRequest):
     # Fixes stupid firefox \\r\\n BS...works in chrome no issues
-    clientRequest = clientRequest.replace("\\\\", "\\")
+    #clientRequest = clientRequest.replace("\\\\", "\\")
     # Star spliting reuest
     splitreq = clientRequest.split("\n")
     method = str(splitreq[0].split(" ")[0]).strip()
