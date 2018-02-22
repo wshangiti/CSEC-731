@@ -77,7 +77,7 @@ def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,des
         file.write(logstring)
         file.close()
 
-def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
+def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser):
     # Process Method
     headers=''
     body=''
@@ -87,7 +87,7 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
     statusCode='400'
     # Add additional Headers
     if(reqMethod == 'POST'):
-        exportHeaderList.append((['BODY', postBody]))
+        exportHeaderList.append((['BODY', reqBody]))
 
     if(DEBUG):
         print(str(exportHeaderList))
@@ -96,10 +96,11 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
             print("export %s='%s'; " % (hmap[0], hmap[1]))
         runscript += "export %s='%s'; " % (hmap[0], hmap[1])
 
+    if(DEBUG):
+        print(runscript)
     # Parse Header Requests
     # ----- HEAD -------
     if (not (os.path.isfile(fullFilePath))):
-        print("++++++++++++++++++++")
         statusCode = '404'
     elif(reqMethod == 'HEAD'):
         try:
@@ -134,13 +135,16 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
             statusCode = '500'
     # ----- PUT -------
     elif(reqMethod == 'PUT'):
-        executeMethod = "ECHO " % (fullFilePath)
-        runscript += executeMethod
-        try:
-            subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
-            statusCode = '200'
-        except:
-            statusCode = '500'
+        if( 'CONTENT_LENGTH' not in runscript):
+            statusCode = '411'
+        else:
+            executeMethod = "echo %s > %s" % (reqBody,fullFilePath)
+            runscript += executeMethod
+            try:
+                body=str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True),'UTF-8')
+                statusCode = '200'
+            except:
+                statusCode = '403'
     # ----- OPTIONS -------
     elif(reqMethod == 'OPTIONS'):
         acceptString = "Allow:"
@@ -166,7 +170,11 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
         statusCode = '200'
     # ----- CONNECT -------
     elif(reqMethod == 'CONNECT'):
-        statusCode = '200'
+        try:
+            subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
+            statusCode = '200'
+        except:
+            statusCode = '401'
     else:
         statusCode='400'
 
@@ -180,12 +188,10 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
 def processRequest(clientRequest):
     # Star spliting reuest
     headers=''
-    postBody=''
+    reqBody=''
     splitreq = clientRequest.split("\n")
     method = str(splitreq[0].split(" ")[0]).strip()
     uri = str(splitreq[0].split(" ")[1]).strip()
-
-    print("URI "+uri)
 
     httpVersion = str(splitreq[0].split(" ")[2]).strip()
     uriparts = getVars(uri)
@@ -201,7 +207,9 @@ def processRequest(clientRequest):
     else:
         fullFilePath = uri
     if(method == "POST"):
-        postBody = splitreq[-1]
+        reqBody = splitreq[-1]
+    if (method == "PUT"):
+        reqBody = clientRequest.split("\r\n\r\n")[1]
     (exportHeaderList, userAgent) = getHeaders(clientRequest,method,fullFilePath,uriparts)
 
     if(DEBUG):
@@ -209,7 +217,7 @@ def processRequest(clientRequest):
         print(str(splitreq))
         print("cgiParserCommand: "+ cgiParser)
         print("CLIENT REQUEST:\n\n" + clientRequest)
-        print("POST BODY: "+ str(postBody))
+        print("POST BODY: "+ str(reqBody))
         print("User Agent: " + userAgent)
         print("Method: "+method)
         print("URI: "+uri)
@@ -224,7 +232,7 @@ def processRequest(clientRequest):
     elif (method not in HTTP_METHODS):
         statusCode = '405'
     else:
-        (statusCode, body, headers) = processMethod(method, exportHeaderList, fullFilePath, postBody,cgiParser)
+        (statusCode, body, headers) = processMethod(method, exportHeaderList, fullFilePath, reqBody,cgiParser)
 
     #If status code of request is not 'OK', then set response body
     if (statusCode != '200'):
