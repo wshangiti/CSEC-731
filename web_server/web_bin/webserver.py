@@ -44,8 +44,7 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
     headerlist.append((['SCRIPT_FILENAME',fullFilePath]))
     headerlist.append((['REQUEST_METHOD', reqMethod]))
 
-    #print(headerlist)
-    print("USERAGENT!!!!!!!!!!!!!" + userAgent)
+
     return (headerlist,userAgent)
 
 def getVars(uri):
@@ -61,7 +60,6 @@ def getfile(http_req):
 
 def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,destPort,userAgent):
     time_stamp = datetime.datetime.now().strftime("%Y-%m-%d::%H:%M:%S")
-    print("USERAGENT+++++++++++++" + userAgent)
     logstring="%s Source:%s:%s Destination:%s:%s \"%s %s\" %s %s \"%s\"\r\n" %(time_stamp,sourceIP,sourcePort,destIP,destPort,method,uri,httpVersion,statusCode,userAgent)
     # Determine Where to Log
     if (statusCode != '200'):
