@@ -5,7 +5,6 @@ import os # Forcommand line execution
 import threading # Conncurrent client connections
 import datetime # Used for logging
 import subprocess # Used for Subprocessing
-import re # For RegExpressions
 import platform
 
 # Import primary configuration File
@@ -36,7 +35,8 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
                 if(hmap[0] == 'User-Agent'):
                     userAgent = headerparts[1]
                 else:
-                    userAgent = ''
+                    #userAgent = ''
+                    pass
         headernum += 1
     headerlist += SERVER_EXPORTS
     if(len(uriparts) > 1):
@@ -45,27 +45,8 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
     headerlist.append((['REQUEST_METHOD', reqMethod]))
 
     #print(headerlist)
+    print("USERAGENT!!!!!!!!!!!!!" + userAgent)
     return (headerlist,userAgent)
-
-def getCGIHeaders(http_req):
-    if(DEBUG):
-        print("CGIHEADER REUESTS:\n\n"+ http_req)
-    splitreq = http_req.split("\n")
-    headerlist = []
-    headernum = 0
-    while headernum < len(splitreq):
-        headerparts = splitreq[headernum].split(": ")
-        for hmap in CGI_BASH_MAP:
-            if (hmap[0] == headerparts[0]):
-                headerparts[1] = (headerparts[1].strip('\r')).strip()
-                headerlist.append(([hmap[1], headerparts[1]]))
-        headernum += 1
-    for he in headerlist:
-        if(he[0] == 'HTTP_COOKIE'):
-            headerlist.append((['SET_COOKIES','TRUE']))
-    if(DEBUG):
-        print(str(headerlist))
-    return headerlist
 
 def getVars(uri):
     uriparts =uri.split('?')
@@ -80,8 +61,9 @@ def getfile(http_req):
 
 def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,destPort,userAgent):
     time_stamp = datetime.datetime.now().strftime("%Y-%m-%d::%H:%M:%S")
+    print("USERAGENT+++++++++++++" + userAgent)
     logstring="%s Source:%s:%s Destination:%s:%s \"%s %s\" %s %s \"%s\"\r\n" %(time_stamp,sourceIP,sourcePort,destIP,destPort,method,uri,httpVersion,statusCode,userAgent)
-    # If log files doent exist create them
+    # Determine Where to Log
     if (statusCode != '200'):
         file = open(LOG_REQUEST_BAD, "a")
         file.write(logstring)
@@ -144,19 +126,7 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
         if (DEBUG):
             print("NEW STRIPPED BODY: " + str(body))
 
-        # Process headers returned from CGI
-        #moreHeaderList = getCGIHeaders(body[0])
-        #extrarunscript = ''
-        #for hmap in moreHeaderList:
-        #    if(DEBUG):
-        #        print("export %s='%s'; " % (hmap[0], hmap[1]))
-        #    extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
-        #if (DEBUG):
-        #    print(extrarunscript)
-        #subprocess.check_output(extrarunscript, stderr=subprocess.STDOUT, shell=True)
         body = str(body[1].replace("\n", ""))
-
-
 
         if(DEBUG):
             print("\n\n\nBODY: \n\n\n"+str(body))
@@ -192,13 +162,15 @@ def processRequest(clientRequest):
     else:
         fullFilePath = uri
     postBody = splitreq[-1]
-    (exportHeaderList,userAgent) = getHeaders(clientRequest,method,fullFilePath,uriparts)
+    (exportHeaderList, userAgent) = getHeaders(clientRequest,method,fullFilePath,uriparts)
+
     if(DEBUG):
         print(str(splitreq[0]))
+        print(str(splitreq))
         print("cgiParserCommand: "+ cgiParser)
         print("CLIENT REQUEST:\n\n" + clientRequest)
         print("POST BODY: "+ str(postBody))
-        print(str(splitreq))
+        print("User Agent: " + userAgent)
         print("Method: "+method)
         print("URI: "+uri)
         print("httpVersion: "+httpVersion)
