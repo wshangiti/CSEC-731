@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Import Needed Libraries
-# 2018_02_20
+# 2018
 import socket # Primary Network Connection
 import os # Forcommand line execution
 import threading # Conncurrent client connections
@@ -17,6 +17,7 @@ exec(open(app_config_file).read())
 WEBAPP_ROOT = WEBAPP_ROOT.rstrip('/')
 
 #print("WEBAPP_ROOT: "+ WEBAPP_ROOT)
+
 ##########################################################
 if(DEBUG):
     print(platform.python_version())
@@ -26,26 +27,30 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
     splitreq = http_req.split("\n")
     headerlist = []
     headernum = 0
+    userAgent = ''
 
-    while splitreq[headernum] != "\r":
-        headerparts = splitreq[headernum].split(": ")
-        for hmap in CGI_BASH_MAP:
-            if(hmap[0] == headerparts[0]):
-                headerparts[1]=(headerparts[1].strip('\r')).strip()
-                headerlist.append(([hmap[1],headerparts[1]]))
-                if(hmap[0] == 'User-Agent'):
-                    userAgent = headerparts[1]
-                else:
-                    #userAgent = ''
-                    pass
-        headernum += 1
-    headerlist += SERVER_EXPORTS
-    if(len(uriparts) > 1):
-        headerlist.append((['QUERY_STRING', uriparts[1]]))
+
+    if(len(splitreq) == '1'):
+        pass
+    else:
+        #while splitreq[headernum] != "\r":
+        while((headernum < len(splitreq)) and (splitreq[headernum] != "\r")):
+            headerparts = splitreq[headernum].split(": ")
+            for hmap in CGI_BASH_MAP:
+                if(hmap[0] == headerparts[0]):
+                    headerparts[1]=(headerparts[1].strip('\r')).strip()
+                    headerlist.append(([hmap[1],headerparts[1]]))
+                    if(hmap[0] == 'User-Agent'):
+                        userAgent = headerparts[1]
+                    else:
+                        #userAgent = ''
+                        pass
+            headernum += 1
+        headerlist += SERVER_EXPORTS
+        if(len(uriparts) > 1):
+            headerlist.append((['QUERY_STRING', uriparts[1]]))
     headerlist.append((['SCRIPT_FILENAME',fullFilePath]))
     headerlist.append((['REQUEST_METHOD', reqMethod]))
-
-
     return (headerlist,userAgent)
 
 def getVars(uri):
@@ -74,17 +79,69 @@ def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,des
 
 def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
     # Process Method
-    if(reqMethod == 'HEAD'):
-        executeMethod=''
-        pass
+    headers=''
+    body=''
+    executeMethod=''
+    runscript = ''
+    # Bas Request by default
+    statusCode='400'
+    # Add additional Headers
+    if(reqMethod == 'POST'):
+        exportHeaderList.append((['BODY', postBody]))
+
+    if(DEBUG):
+        print(str(exportHeaderList))
+    for hmap in exportHeaderList:
+        if(DEBUG):
+            print("export %s='%s'; " % (hmap[0], hmap[1]))
+        runscript += "export %s='%s'; " % (hmap[0], hmap[1])
+
+    # Parse Header Requests
+    # ----- HEAD -------
+    if (not (os.path.isfile(fullFilePath))):
+        print("++++++++++++++++++++")
+        statusCode = '404'
+    elif(reqMethod == 'HEAD'):
+        try:
+            subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
+        except Exception as e:
+            print(e)
+            statusCode = '500'
+    # ----- GET/POST -------
     elif(reqMethod == 'GET' or reqMethod == 'POST'):
         if(reqMethod == 'GET'):
             executeMethod = "%s %s" % (cgiParser,fullFilePath)
         else: # IF POST
-            exportHeaderList.append((['BODY', postBody]))
             executeMethod = "echo $BODY | %s" % cgiParser
+        runscript += executeMethod
+        try:
+            body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True),'UTF-8')
+            headers= body
+            if (DEBUG):
+                print("ORIGBODY: \n\n" + body)
+            body = body.strip('^b"').split("\r\n\r\n")
+            if (DEBUG):
+                print("NEW STRIPPED BODY: " + str(body))
+            body = str(body[1].replace("\n", ""))
+
+            if(DEBUG):
+                print("\n\n\nBODY: \n\n\n"+str(body))
+                print("\n\n\nBODY LEN : %i" % len(body))
+
+            statusCode = '200'
+        except Exception as e:
+            print(e)
+            statusCode = '500'
+    # ----- PUT -------
     elif(reqMethod == 'PUT'):
-        pass
+        executeMethod = "ECHO " % (fullFilePath)
+        runscript += executeMethod
+        try:
+            subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
+            statusCode = '200'
+        except:
+            statusCode = '500'
+    # ----- OPTIONS -------
     elif(reqMethod == 'OPTIONS'):
         acceptString = "Allow:"
         for meth in HTTP_METHODS:
@@ -93,59 +150,42 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
         acceptString = acceptString[:-1]
         if(DEBUG):
             print(acceptString)
+        headers = acceptString
         statusCode = '200'
-        return (statusCode, body)
+    # ----- DELETE -------
     elif(reqMethod == 'DELETE'):
-        pass
+        executeMethod = "rm -f %s" % (fullFilePath)
+        runscript += executeMethod
+        try:
+            subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
+            statusCode = '200'
+        except:
+            statusCode = '403'
+    # ----- TRACE -------
     elif(reqMethod == 'TRACE'):
-        pass
+        statusCode = '200'
+    # ----- CONNECT -------
     elif(reqMethod == 'CONNECT'):
-        pass
+        statusCode = '200'
     else:
-        statusCode='405'
+        statusCode='400'
 
     # Process Headers
-    runscript = ''
-    if(DEBUG):
-        print(str(exportHeaderList))
-    for hmap in exportHeaderList:
-        if(DEBUG):
-            print("export %s='%s'; " % (hmap[0], hmap[1]))
-        runscript += "export %s='%s'; " % (hmap[0], hmap[1])
-    runscript += executeMethod
+
     if(DEBUG):
         print("RUN SCRIPT\n\n%s\n\n" % str(runscript))
 
-    try:
-        body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True),'UTF-8')
-        origbody= body
-        if (DEBUG):
-            print("ORIGBODY: \n\n" + body)
-        body = body.strip('^b"').split("\r\n\r\n")
-        if (DEBUG):
-            print("NEW STRIPPED BODY: " + str(body))
-
-        body = str(body[1].replace("\n", ""))
-
-        if(DEBUG):
-            print("\n\n\nBODY: \n\n\n"+str(body))
-            print("\n\n\nBODY LEN : %i" % len(body))
-
-
-        statusCode = '200'
-    except Exception as e:
-        print(e)
-        statusCode = '500'
-        body = ''
-        origbody = ''
-
-    return(statusCode,body,origbody)
+    return(statusCode,body,headers)
 
 def processRequest(clientRequest):
     # Star spliting reuest
+    headers=''
+    postBody=''
     splitreq = clientRequest.split("\n")
     method = str(splitreq[0].split(" ")[0]).strip()
     uri = str(splitreq[0].split(" ")[1]).strip()
+
+    print("URI "+uri)
 
     httpVersion = str(splitreq[0].split(" ")[2]).strip()
     uriparts = getVars(uri)
@@ -160,7 +200,8 @@ def processRequest(clientRequest):
         fullFilePath = os.path.abspath(WEBAPP_ROOT + uriparts[0])
     else:
         fullFilePath = uri
-    postBody = splitreq[-1]
+    if(method == "POST"):
+        postBody = splitreq[-1]
     (exportHeaderList, userAgent) = getHeaders(clientRequest,method,fullFilePath,uriparts)
 
     if(DEBUG):
@@ -182,8 +223,6 @@ def processRequest(clientRequest):
     # 405 Check
     elif (method not in HTTP_METHODS):
         statusCode = '405'
-    elif (not (os.path.isfile(WEBAPP_ROOT + uriparts[0]))):
-        statusCode = '404'
     else:
         (statusCode, body, headers) = processMethod(method, exportHeaderList, fullFilePath, postBody,cgiParser)
 
@@ -201,6 +240,7 @@ def processRequest(clientRequest):
 
 def requestHandler(clientSock):
     clientReq=clientSock.recv(1024).decode()
+    #clientReq = str(bytes(clientSock.recv(1024)),'UTF-8')
     sourceIP = clientSock.getpeername()[0]
     sourcePort=clientSock.getpeername()[1]
     destIP= clientSock.getsockname()[0]
