@@ -100,9 +100,8 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser):
         print(runscript)
     # Parse Header Requests
     # ----- HEAD -------
-    if (not (os.path.isfile(fullFilePath))):
-        statusCode = '404'
-    elif(reqMethod == 'HEAD'):
+
+    if(reqMethod == 'HEAD'):
         try:
             subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
         except Exception as e:
@@ -110,29 +109,32 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser):
             statusCode = '500'
     # ----- GET/POST -------
     elif(reqMethod == 'GET' or reqMethod == 'POST'):
-        if(reqMethod == 'GET'):
-            executeMethod = "%s %s" % (cgiParser,fullFilePath)
-        else: # IF POST
-            executeMethod = "echo $BODY | %s" % cgiParser
-        runscript += executeMethod
-        try:
-            body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True),'UTF-8')
-            headers= body
-            if (DEBUG):
-                print("ORIGBODY: \n\n" + body)
-            body = body.strip('^b"').split("\r\n\r\n")
-            if (DEBUG):
-                print("NEW STRIPPED BODY: " + str(body))
-            body = str(body[1].replace("\n", ""))
+        if (not (os.path.isfile(fullFilePath))):
+            statusCode = '404'
+        else:
+            if(reqMethod == 'GET'):
+                executeMethod = "%s %s" % (cgiParser,fullFilePath)
+            else: # IF POST
+                executeMethod = "echo $BODY | %s" % cgiParser
+            runscript += executeMethod
+            try:
+                body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True),'UTF-8')
+                headers= body
+                if (DEBUG):
+                    print("ORIGBODY: \n\n" + body)
+                body = body.strip('^b"').split("\r\n\r\n")
+                if (DEBUG):
+                    print("NEW STRIPPED BODY: " + str(body))
+                body = str(body[1].replace("\n", ""))
 
-            if(DEBUG):
-                print("\n\n\nBODY: \n\n\n"+str(body))
-                print("\n\n\nBODY LEN : %i" % len(body))
+                if(DEBUG):
+                    print("\n\n\nBODY: \n\n\n"+str(body))
+                    print("\n\n\nBODY LEN : %i" % len(body))
 
-            statusCode = '200'
-        except Exception as e:
-            print(e)
-            statusCode = '500'
+                statusCode = '200'
+            except Exception as e:
+                print(e)
+                statusCode = '500'
     # ----- PUT -------
     elif(reqMethod == 'PUT'):
         if( 'CONTENT_LENGTH' not in runscript):
@@ -158,22 +160,64 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser):
         statusCode = '200'
     # ----- DELETE -------
     elif(reqMethod == 'DELETE'):
-        executeMethod = "rm -f %s" % (fullFilePath)
-        runscript += executeMethod
-        try:
-            subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
-            statusCode = '200'
-        except:
-            statusCode = '403'
+        if (not (os.path.isfile(fullFilePath))):
+            statusCode = '404'
+        else:
+            executeMethod = "rm -f %s" % (fullFilePath)
+            runscript += executeMethod
+            print(executeMethod)
+            try:
+                subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
+                statusCode = '200'
+            except:
+                # Permission Denied
+                statusCode = '403'
     # ----- TRACE -------
     elif(reqMethod == 'TRACE'):
         statusCode = '200'
-    # ----- CONNECT -------
+    # ----- CONNECT -------temp.txt
     elif(reqMethod == 'CONNECT'):
+        conn_host=''
+        conn_port=''
+        if(fullFilePath.startswith('http://')):
+            conn_host=fullFilePath.strip('http://')
+        if(fullFilePath.startswith('https://')):
+            conn_host=fullFilePath.strip('https://')
+        if(':' in fullFilePath and fullFilePath.startswith('http')):
+            conn_url=fullFilePath.split(':')
+            conn_host = conn_url[0] + ":"+conn_url[1]
+            # Port is specified
+            if(len(conn_url) =='3'):
+                conn_port = conn_url[2]
+            else:
+                conn_port = '80'
+        elif (':' in fullFilePath):
+            conn_url = fullFilePath.split(':')
+            conn_host = conn_url[0]
+            if (len(conn_url) == '2'):
+                conn_port = conn_url[1]
+            else:
+                conn_port = '80'
+        else:
+            conn_host=fullFilePath
+            conn_port = '80'
+
         try:
             subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
+            connect_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # Allows reuse of Socket Address
+            connect_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            connect_sock.settimeout(0.30)
+
+            # Binds Socket
+            connect_sock.connect((conn_host,int(conn_port)))
+            connect_sock.send(bytes("GET / HTTP/1.1\r\n\r\n",'UTF-8'))
+            body = connect_sock.recv(1024).decode()
+            connect_sock.close()
             statusCode = '200'
-        except:
+        except (OSError,):
+            print("Exception Caught")
+            connect_sock.close()
             statusCode = '401'
     else:
         statusCode='400'
@@ -202,14 +246,18 @@ def processRequest(clientRequest):
         cgiParser = ''
 
     # Checks if URI = *; primarily for options request
-    if(uri != "*"):
+    if(uri != '*' or uri.startswith('\\')):
         fullFilePath = os.path.abspath(WEBAPP_ROOT + uriparts[0])
     else:
         fullFilePath = uri
     if(method == "POST"):
         reqBody = splitreq[-1]
     if (method == "PUT"):
-        reqBody = clientRequest.split("\r\n\r\n")[1]
+        try:
+            reqBody = clientRequest.split("\r\n\r\n")[1]
+        except:
+            pass
+
     (exportHeaderList, userAgent) = getHeaders(clientRequest,method,fullFilePath,uriparts)
 
     if(DEBUG):
