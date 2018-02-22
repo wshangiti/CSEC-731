@@ -7,7 +7,7 @@ import datetime # Used for logging
 import subprocess # Used for Subprocessing
 import re # For RegExpressions
 import platform
-print(platform.python_version())
+
 # Import primary configuration File
 server_config_file="../web_etc/server.config"
 app_config_file="../web_etc/app.config"
@@ -18,7 +18,8 @@ WEBAPP_ROOT = WEBAPP_ROOT.rstrip('/')
 
 #print("WEBAPP_ROOT: "+ WEBAPP_ROOT)
 ##########################################################
-
+if(DEBUG):
+    print(platform.python_version())
 ###### Primary functions
 
 def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
@@ -28,7 +29,7 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
 
     while splitreq[headernum] != "\r":
         headerparts = splitreq[headernum].split(": ")
-        for hmap in HTTP_BASH_MAP:
+        for hmap in CGI_BASH_MAP:
             if(hmap[0] == headerparts[0]):
                 headerparts[1]=(headerparts[1].strip('\r')).strip()
                 headerlist.append(([hmap[1],headerparts[1]]))
@@ -37,7 +38,7 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
                 else:
                     userAgent = ''
         headernum += 1
-    headerlist += DEFAULT_EXPORTS
+    headerlist += SERVER_EXPORTS
     if(len(uriparts) > 1):
         headerlist.append((['QUERY_STRING', uriparts[1]]))
     headerlist.append((['SCRIPT_FILENAME',fullFilePath]))
@@ -47,13 +48,14 @@ def getHeaders(http_req,reqMethod,fullFilePath,uriparts):
     return (headerlist,userAgent)
 
 def getCGIHeaders(http_req):
-    print("CGIHEADER REUESTS:\n\n"+ http_req)
+    if(DEBUG):
+        print("CGIHEADER REUESTS:\n\n"+ http_req)
     splitreq = http_req.split("\n")
     headerlist = []
     headernum = 0
     while headernum < len(splitreq):
         headerparts = splitreq[headernum].split(": ")
-        for hmap in HTTP_BASH_MAP:
+        for hmap in CGI_BASH_MAP:
             if (hmap[0] == headerparts[0]):
                 headerparts[1] = (headerparts[1].strip('\r')).strip()
                 headerlist.append(([hmap[1], headerparts[1]]))
@@ -123,15 +125,19 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
 
     # Process Headers
     runscript = ''
-    print(str(exportHeaderList))
+    if(DEBUG):
+        print(str(exportHeaderList))
     for hmap in exportHeaderList:
-        print("export %s='%s'; " % (hmap[0], hmap[1]))
+        if(DEBUG):
+            print("export %s='%s'; " % (hmap[0], hmap[1]))
         runscript += "export %s='%s'; " % (hmap[0], hmap[1])
     runscript += executeMethod
-    print("RUN SCRIPT\n\n%s\n\n" % str(runscript))
+    if(DEBUG):
+        print("RUN SCRIPT\n\n%s\n\n" % str(runscript))
 
     try:
         body = str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True),'UTF-8')
+        origbody= body
         if (DEBUG):
             print("ORIGBODY: \n\n" + body)
         body = body.strip('^b"').split("\r\n\r\n")
@@ -139,26 +145,34 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,postBody,cgiParser):
             print("NEW STRIPPED BODY: " + str(body))
 
         # Process headers returned from CGI
-        moreHeaderList = getCGIHeaders(body[0])
-        extrarunscript = ''
-        for hmap in moreHeaderList:
-            print("export %s='%s'; " % (hmap[0], hmap[1]))
-            extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
-        if (DEBUG):
-            print(extrarunscript)
-        subprocess.check_output(extrarunscript, stderr=subprocess.STDOUT, shell=True)
+        #moreHeaderList = getCGIHeaders(body[0])
+        #extrarunscript = ''
+        #for hmap in moreHeaderList:
+        #    if(DEBUG):
+        #        print("export %s='%s'; " % (hmap[0], hmap[1]))
+        #    extrarunscript += "export %s='%s'; " % (hmap[0], hmap[1])
+        #if (DEBUG):
+        #    print(extrarunscript)
+        #subprocess.check_output(extrarunscript, stderr=subprocess.STDOUT, shell=True)
         body = str(body[1].replace("\n", ""))
+
+
+
+        if(DEBUG):
+            print("\n\n\nBODY: \n\n\n"+str(body))
+            print("\n\n\nBODY LEN : %i" % len(body))
+
+
         statusCode = '200'
     except Exception as e:
         print(e)
         statusCode = '500'
         body = ''
+        origbody = ''
 
-    return(statusCode,body)
+    return(statusCode,body,origbody)
 
 def processRequest(clientRequest):
-    # Fixes stupid firefox \\r\\n BS...works in chrome no issues
-    #clientRequest = clientRequest.replace("\\\\", "\\")
     # Star spliting reuest
     splitreq = clientRequest.split("\n")
     method = str(splitreq[0].split(" ")[0]).strip()
@@ -200,16 +214,19 @@ def processRequest(clientRequest):
     elif (not (os.path.isfile(WEBAPP_ROOT + uriparts[0]))):
         statusCode = '404'
     else:
-        (statusCode, body) = processMethod(method, exportHeaderList, fullFilePath, postBody,cgiParser)
+        (statusCode, body, headers) = processMethod(method, exportHeaderList, fullFilePath, postBody,cgiParser)
 
     #If status code of request is not 'OK', then set response body
     if (statusCode != '200'):
         body = "<b>" + statusCode + ": </b>" + RESPONSE_CODES[statusCode]
 
-    response="HTTP/1.1 %s %s\r\n\r\n" % (statusCode,RESPONSE_CODES[statusCode])
+    if (body == ''):
+        response = "HTTP/1.1 %s %s\r\n" % (statusCode, RESPONSE_CODES[statusCode])
+    else:
+        response="HTTP/1.1 %s %s\r\n\r\n" % (statusCode,RESPONSE_CODES[statusCode])
     footer="\r\n\r\n"
 
-    return (response, body, footer, method, httpVersion, statusCode, uri, userAgent)
+    return (response, body, footer, method, httpVersion, statusCode, uri, userAgent,headers)
 
 def requestHandler(clientSock):
     clientReq=clientSock.recv(1024).decode()
@@ -218,12 +235,19 @@ def requestHandler(clientSock):
     destIP= clientSock.getsockname()[0]
     destPort= clientSock.getsockname()[1]
 
-    print("SOURCE IP: "+ sourceIP)
+    print("Full Request is: \n\n%s\n-----------------------------" % clientReq)
+    if(DEBUG):
+        print("SOURCE IP: "+ sourceIP)
 
-    (response, body, footer, method, httpVersion, statusCode, uri, userAgent) = processRequest(clientReq)
+    (response, body, footer, method, httpVersion, statusCode, uri, userAgent, headers) = processRequest(clientReq)
 
-    fullResponse ="%s%s%s" % (response,body,footer)
+    if(body == ''):
+        fullResponse = "%s%s%s" % (response, headers, footer)
+    else:
+        fullResponse = "%s%s%s" % (response,body,footer)
     # Log Request to File
+
+    print("Full Response is: \n\n%s\n-----------------------------" % fullResponse)
     log_request(method, httpVersion, statusCode, uri, sourceIP, sourcePort, destIP, destPort, userAgent)
 
     clientSock.send(fullResponse.encode())
