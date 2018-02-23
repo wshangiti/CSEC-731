@@ -273,11 +273,11 @@ def processRequest(clientRequest):
         print("fullFilePath: "+fullFilePath)
         print("uriparts: "+str(uriparts))
         print("NEW HEADER LIST:\n\n"+str(exportHeaderList))
-    # 505 Check
-    if (httpVersion not in HTTP_VERSION_SUPPORT):
+
+    # Parse request message
+    if (httpVersion not in HTTP_VERSION_SUPPORT): # 505 Check
         statusCode = '505'
-    # 405 Check
-    elif (method not in HTTP_METHODS):
+    elif (method not in HTTP_METHODS): # 405 Check
         statusCode = '405'
     else:
         (statusCode, body, headers) = processMethod(method, exportHeaderList, fullFilePath, reqBody,cgiParser)
@@ -286,17 +286,17 @@ def processRequest(clientRequest):
     if (statusCode != '200'):
         body = "<b>" + statusCode + ": </b>" + RESPONSE_CODES[statusCode]
 
+    # Determine if just headers are sent in the request
     if (body == ''):
         response = "HTTP/1.1 %s %s\r\n" % (statusCode, RESPONSE_CODES[statusCode])
     else:
         response="HTTP/1.1 %s %s\r\n\r\n" % (statusCode,RESPONSE_CODES[statusCode])
-    footer="\r\n\r\n"
 
+    footer="\r\n\r\n"
     return (response, body, footer, method, httpVersion, statusCode, uri, userAgent,headers)
 
 def requestHandler(clientSock):
     clientReq=clientSock.recv(1024).decode()
-    #clientReq = str(bytes(clientSock.recv(1024)),'UTF-8')
     sourceIP = clientSock.getpeername()[0]
     sourcePort=clientSock.getpeername()[1]
     destIP= clientSock.getsockname()[0]
@@ -306,7 +306,10 @@ def requestHandler(clientSock):
     if(DEBUG):
         print("SOURCE IP: "+ sourceIP)
 
-    (response, body, footer, method, httpVersion, statusCode, uri, userAgent, headers) = processRequest(clientReq)
+    try:
+        (response, body, footer, method, httpVersion, statusCode, uri, userAgent, headers) = processRequest(clientReq)
+    except:
+        pass
 
     if(body == ''):
         fullResponse = "%s%s%s" % (response, headers, footer)
