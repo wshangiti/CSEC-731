@@ -180,6 +180,8 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser,uri)
     # ----- CONNECT -------temp.txt
     elif(reqMethod == 'CONNECT'):
         print('**************\n\nURI:'+ uri)
+
+        # Clean up URI
         if(uri.startswith('http://')):
             reqUri=uri.strip('http://')
         elif(uri.startswith('https://')):
@@ -187,7 +189,6 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser,uri)
         else:
             reqUri=uri
 
-        print('**************\n\nreqUri:' + reqUri)
 
         if(':' in reqUri):
             conn_url=reqUri.split(':')
@@ -197,23 +198,19 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser,uri)
                 conn_port = conn_port.split('/')[0]
         else:
             conn_port = '80'
-
-        print('**************\n\nconn_port:' + conn_port)
         try:
             subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
             connect_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # Allows reuse of Socket Address
             connect_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             connect_sock.settimeout(0.30)
+            #Clean up URI
             if('/' in reqUri):
                 resource= reqUri.split('/')[1]
                 reqUri = reqUri.split('/')[0]
             else:
                 resource='/'
 
-
-            print('**************\n\nreqUri:' + reqUri)
-            print('**************\n\nresource:' + resource)
             # Binds Socket
             connect_sock.connect((reqUri,int(conn_port)))
             connect_sock.send(bytes("GET "+ resource +" HTTP/1.1\r\n\r\n",'UTF-8'))
