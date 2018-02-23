@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # Import Needed Libraries
-# 2018
 import socket # Primary Network Connection
 import os # Forcommand line execution
 import threading # Conncurrent client connections
 import datetime # Used for logging
 import subprocess # Used for Subprocessing
-import platform
+import platform # Python Version Debugging
 
 # Import primary configuration File
 server_config_file="../web_etc/server.config"
@@ -180,41 +179,44 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser,uri)
         statusCode = '200'
     # ----- CONNECT -------temp.txt
     elif(reqMethod == 'CONNECT'):
-        conn_host=''
-        conn_port=''
-        if(fullFilePath.startswith('http://')):
-            conn_host=fullFilePath.strip('http://')
-        if(fullFilePath.startswith('https://')):
-            conn_host=fullFilePath.strip('https://')
-        if(':' in fullFilePath and fullFilePath.startswith('http')):
-            conn_url=fullFilePath.split(':')
-            conn_host = conn_url[0] + ":"+conn_url[1]
-            # Port is specified
-            if(len(conn_url) =='3'):
-                conn_port = conn_url[2]
-            else:
-                conn_port = '80'
-        elif (':' in fullFilePath):
-            conn_url = fullFilePath.split(':')
-            conn_host = conn_url[0]
-            if (len(conn_url) == '2'):
-                conn_port = conn_url[1]
-            else:
-                conn_port = '80'
+        print('**************\n\nURI:'+ uri)
+        if(uri.startswith('http://')):
+            reqUri=uri.strip('http://')
+        elif(uri.startswith('https://')):
+            reqUri=uri.strip('https://')
         else:
-            conn_host=fullFilePath
+            reqUri=uri
+
+        print('**************\n\nreqUri:' + reqUri)
+
+        if(':' in reqUri):
+            conn_url=reqUri.split(':')
+            # Port is specified
+            conn_port = conn_url[1]
+            if ('/' in conn_port):
+                conn_port = conn_port.split('/')[0]
+        else:
             conn_port = '80'
 
+        print('**************\n\nconn_port:' + conn_port)
         try:
             subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
             connect_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # Allows reuse of Socket Address
             connect_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             connect_sock.settimeout(0.30)
-            uritest= uri.split("/") 
+            if('/' in reqUri):
+                resource= reqUri.split('/')[1]
+                reqUri = reqUri.split('/')[0]
+            else:
+                resource='/'
+
+
+            print('**************\n\nreqUri:' + reqUri)
+            print('**************\n\nresource:' + resource)
             # Binds Socket
-            connect_sock.connect((uritest[0],int(conn_port)))
-            connect_sock.send(bytes("GET /"+ uritest[1] +" HTTP/1.1\r\n\r\n",'UTF-8'))
+            connect_sock.connect((reqUri,int(conn_port)))
+            connect_sock.send(bytes("GET "+ resource +" HTTP/1.1\r\n\r\n",'UTF-8'))
             body = connect_sock.recv(1024).decode()
             connect_sock.close()
             statusCode = '200'
