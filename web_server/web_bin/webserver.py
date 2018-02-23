@@ -137,13 +137,16 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser):
                 statusCode = '500'
     # ----- PUT -------
     elif(reqMethod == 'PUT'):
+        print(runscript)
         if( 'CONTENT_LENGTH' not in runscript):
             statusCode = '411'
         else:
-            executeMethod = "echo %s > %s" % (reqBody,fullFilePath)
+            executeMethod = "echo '%s' > %s" % (reqBody,fullFilePath)
             runscript += executeMethod
+            print(runscript)
             try:
-                body=str(subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True),'UTF-8')
+                subprocess.check_output(runscript, stderr=subprocess.STDOUT, shell=True)
+                body="OK"
                 statusCode = '200'
             except:
                 statusCode = '403'
@@ -255,7 +258,9 @@ def processRequest(clientRequest):
     if (method == "PUT"):
         try:
             reqBody = clientRequest.split("\r\n\r\n")[1]
+            print("REQ BODY:\n%s" % reqBody)
         except:
+            print("Cannot split request")
             pass
 
     (exportHeaderList, userAgent) = getHeaders(clientRequest,method,fullFilePath,uriparts)
@@ -306,10 +311,9 @@ def requestHandler(clientSock):
     if(DEBUG):
         print("SOURCE IP: "+ sourceIP)
 
-    try:
-        (response, body, footer, method, httpVersion, statusCode, uri, userAgent, headers) = processRequest(clientReq)
-    except:
-        pass
+
+    (response, body, footer, method, httpVersion, statusCode, uri, userAgent, headers) = processRequest(clientReq)
+
 
     if(body == ''):
         fullResponse = "%s%s%s" % (response, headers, footer)
