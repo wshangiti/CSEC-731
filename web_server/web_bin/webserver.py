@@ -77,7 +77,7 @@ def log_request(method,httpVersion,statusCode,uri,sourceIP,sourcePort,destIP,des
         file.write(logstring)
         file.close()
 
-def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser):
+def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser,uri):
     # Process Method
     headers=''
     body=''
@@ -211,10 +211,10 @@ def processMethod(reqMethod,exportHeaderList,fullFilePath,reqBody,cgiParser):
             # Allows reuse of Socket Address
             connect_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             connect_sock.settimeout(0.30)
-
+            uritest= uri.split("/") 
             # Binds Socket
-            connect_sock.connect((conn_host,int(conn_port)))
-            connect_sock.send(bytes("GET / HTTP/1.1\r\n\r\n",'UTF-8'))
+            connect_sock.connect((uritest[0],int(conn_port)))
+            connect_sock.send(bytes("GET /"+ uritest[1] +" HTTP/1.1\r\n\r\n",'UTF-8'))
             body = connect_sock.recv(1024).decode()
             connect_sock.close()
             statusCode = '200'
@@ -285,7 +285,7 @@ def processRequest(clientRequest):
     elif (method not in HTTP_METHODS): # 405 Check
         statusCode = '405'
     else:
-        (statusCode, body, headers) = processMethod(method, exportHeaderList, fullFilePath, reqBody,cgiParser)
+        (statusCode, body, headers) = processMethod(method, exportHeaderList, fullFilePath, reqBody,cgiParser,uri)
 
     #If status code of request is not 'OK', then set response body
     if (statusCode != '200'):
